@@ -1,0 +1,20 @@
+# Core testing dependencies
+playwright>=1.44.0
+pytest>=8.4.0
+pytest-bdd>=8.1.0
+pytest-html>=4.1.0
+pytest-metadata>=3.1.0
+pytest-xdist>=3.3.0
+
+# API and utilities for generator
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# Development and reporting
+colorama>=0.4.6
+rich>=13.0.0
+click>=8.0.0
+
+# Additional utilities
+pathlib2>=2.3.7; python_version < "3.4"
+typing-extensions>=4.0.0
