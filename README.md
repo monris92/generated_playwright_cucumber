@@ -1,9 +1,9 @@
 # 🎭 Playwright to Cucumber BDD Generator v2.0
 
+
 ![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![Python](https://img.shields.io/badge/python-3.8%2B-green)
-![Status](https://img.shields.i## 📋 Complete Workflow: From Install to Running Tests/badge/status-production--ready-brightgreen)
-
+![Status](https://img.shields## 📋 Complete Workflow: From Install to Running Testsio/badge/status-production--ready-brightgreen)
 ## 📋 Overview
 
 A fully automated, **AI-powered workflow** that converts Playwright scripts into **production-ready Cucumber BDD** test projects with **zero manual intervention**. Powered by Mistral AI with intelligent post-processing, this generator produces immediately executable BDD tests following industry best practices.
@@ -53,9 +53,6 @@ python enhanced_cucumber_generator_fixed_v2.py
 cd YourProjectName
 pytest test_*.py -v
 ```
-```
-
-## � Project Structure
 
 ## 🛠️ Installation & Setup (REQUIRED FIRST TIME)
 
