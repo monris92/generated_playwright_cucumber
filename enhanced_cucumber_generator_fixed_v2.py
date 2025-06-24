@@ -9,7 +9,7 @@ from pathlib import Path
 
 class CucumberGenerator:
     def __init__(self):
-        self.mistral_api_key = "jXiU2TQZM4Rj13JJD44Gp0mm4iLZVCJx"
+        self.mistral_api_key = "YOUR_AI_KEY"
         self.mistral_api_url = "https://api.mistral.ai/v1/chat/completions"
         self.base_folder = None
         self.feature_label = None
