@@ -595,7 +595,7 @@ scenarios('features/{self.feature_label}/{self.feature_label}.feature')
 def browser():
     """Create browser instance"""
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=False, slow_mo=600)
         yield browser
         browser.close()
 
@@ -603,6 +603,7 @@ def browser():
 def context(browser):
     """Create browser context"""
     context = browser.new_context()
+    context.grant_permissions([])
     yield context
     context.close()
 
