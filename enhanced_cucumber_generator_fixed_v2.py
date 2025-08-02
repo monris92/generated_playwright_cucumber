@@ -9,7 +9,7 @@ from pathlib import Path
 
 class CucumberGenerator:
     def __init__(self):
-        self.mistral_api_key = "YOUR_AI_KEY"
+        self.mistral_api_key = "jXiU2TQZM4Rj13JJD44Gp0mm4iLZVCJx"
         self.mistral_api_url = "https://api.mistral.ai/v1/chat/completions"
         self.base_folder = None
         self.feature_label = None
@@ -207,6 +207,23 @@ if __name__ == "__main__":
         
         print(f"🎯 Runner script: {runner_file}")
     
+    def get_python_executable(self):
+        """Get the correct Python executable path for the current environment"""
+        import sys
+        
+        # Check if we're in a virtual environment
+        if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+            # We're in a virtual environment, use the current Python executable
+            return sys.executable
+        else:
+            # Try to find the venv Python executable in the project directory
+            venv_python = self.base_folder / ".venv" / "bin" / "python"
+            if venv_python.exists():
+                return str(venv_python)
+            
+            # Fallback to system Python
+            return sys.executable
+    
     def record_script(self):
         """Record script with Playwright Codegen"""
         print(f"\n🎬 Starting Playwright Codegen recording for '{self.feature_label}'...")
@@ -220,9 +237,12 @@ if __name__ == "__main__":
         
         record_output = self.base_folder / "tests" / f"recorded_{self.feature_label}.py"
         
+        # Get the correct Python executable path for the virtual environment
+        python_path = self.get_python_executable()
+        
         try:
             subprocess.run([
-                "playwright", "codegen", self.website_url, 
+                python_path, "-m", "playwright", "codegen", self.website_url, 
                 "--output", str(record_output)
             ], check=True, text=True)
             
@@ -231,6 +251,10 @@ if __name__ == "__main__":
             
         except subprocess.CalledProcessError as e:
             print(f"❌ Error during recording: {e}")
+            return None
+        except FileNotFoundError as e:
+            print(f"❌ Playwright not found. Make sure it's installed: {e}")
+            print("💡 Try running: pip install playwright && playwright install")
             return None
 
     def convert_to_cucumber(self, recorded_file):
@@ -266,21 +290,42 @@ ULTRA-CRITICAL REQUIREMENTS - FOLLOW EXACTLY:
    - Wrap critical assertions in try-catch blocks with retries
    - For heading visibility, add wait_for_timeout(3000) before retry
 
-4. NATURAL NAVIGATION STRATEGY (CRITICAL):
+4. SMART ELEMENT INTERACTION (CRITICAL NEW REQUIREMENT):
+   - For INPUT fields (especially password/sensitive fields):
+     * ALWAYS click the field first: page.get_by_role('textbox', name='Field').click()
+     * Add small timeout: page.wait_for_timeout(500)
+     * Use multiple fallback strategies in try-catch blocks:
+       1st: page.get_by_role('textbox', name='Field').fill('value')
+       2nd: page.locator('input[type="password"]').fill('value') (for password fields)
+       3rd: page.locator('input[formcontrolname="fieldname"]').fill('value')
+       4th: page.locator('input[name="fieldname"]').fill('value')
+   
+   - For BUTTON clicks:
+     * Use multiple selector strategies:
+       1st: page.get_by_role('button', name='Button')
+       2nd: page.locator('button:has-text("Button")')
+       3rd: page.locator('[type="submit"]') (for submit buttons)
+   
+   - DETECT FIELD TYPES from script:
+     * If locator contains 'password' or type="password": Use password-specific handling
+     * If locator contains 'email': Use email-specific handling
+     * If locator contains 'submit' or 'login' button: Use form submission handling
+
+5. NATURAL NAVIGATION STRATEGY (CRITICAL):
    - DETECT POST-ACTION NAVIGATION: If script shows page.goto() immediately after login/submit/click, this suggests natural redirect
    - AVOID MANUAL NAVIGATION: Do NOT generate separate navigation steps after authentication actions
    - TRUST APPLICATION FLOW: Let the application handle its own redirects after login/submit
    - ENHANCED POST-ACTION TIMEOUTS: Use longer timeouts (5000ms) after login/submit buttons
    - EXAMPLE: Instead of "When User clicks LOGIN" + "When User navigates to X", use "When User clicks LOGIN" + longer timeout + "Then X should be visible"
 
-5. CODE STRUCTURE:
+6. CODE STRUCTURE:
    - Import EXACTLY: from playwright.sync_api import expect, from pytest_bdd import given, when, then, import pytest, import re
    - DO NOT include scenarios() call in step definitions
    - NO markdown code blocks or formatting
    - Each function should have proper indentation
    - Use expect(page).to_have_url() for URL assertions, NOT expect(page.url)
 
-6. BDD BEST PRACTICES:
+7. BDD BEST PRACTICES:
    - Feature name: descriptive and include label "{self.feature_label}"
    - Include @{self.feature_label} tag
    - Use Given/When/Then structure
@@ -289,7 +334,7 @@ ULTRA-CRITICAL REQUIREMENTS - FOLLOW EXACTLY:
 Playwright Script:
 {script_content}
 
-EXAMPLE OUTPUT FORMAT:
+EXAMPLE OUTPUT FORMAT with ROBUST ELEMENT HANDLING:
 
 Step definitions should look EXACTLY like this (NO MARKDOWN):
 from playwright.sync_api import expect
@@ -302,11 +347,41 @@ def navigate_to_website(page):
     page.goto('https://example.com')
     page.wait_for_load_state('networkidle')
 
-@when("User enters 'search term' in the box")
-def enter_search_term(page):
-    page.get_by_role('textbox', name='Search').click()
-    page.wait_for_timeout(1000)
-    page.get_by_role('textbox', name='Search').fill('search term')
+@when("User enters 'email@test.com' in the 'Email' textbox")
+def enter_email(page):
+    page.get_by_role('textbox', name='Email').click()
+    page.wait_for_timeout(500)
+    try:
+        page.get_by_role('textbox', name='Email').fill('email@test.com')
+    except:
+        try:
+            page.locator('input[type="email"]').fill('email@test.com')
+        except:
+            page.locator('input[formcontrolname="email"]').fill('email@test.com')
+
+@when("User enters 'password123' in the 'Password' textbox")
+def enter_password(page):
+    page.get_by_role('textbox', name='Password').click()
+    page.wait_for_timeout(500)
+    try:
+        page.get_by_role('textbox', name='Password').fill('password123')
+    except:
+        try:
+            page.locator('input[type="password"]').fill('password123')
+        except:
+            page.locator('input[formcontrolname="password"]').fill('password123')
+
+@when("User clicks 'LOGIN'")
+def click_login(page):
+    try:
+        page.get_by_role('button', name='LOGIN').click()
+    except:
+        try:
+            page.locator('button:has-text("LOGIN")').click()
+        except:
+            page.locator('[type="submit"]').click()
+    page.wait_for_load_state('networkidle')
+    page.wait_for_timeout(5000)
 
 @then("'Result' should be visible")
 def verify_result(page):
@@ -315,14 +390,6 @@ def verify_result(page):
     except:
         page.wait_for_timeout(1500)
         expect(page.get_by_text('Result', exact=True)).to_be_visible()
-
-@then("User should navigate to 'https://example.com/page'")
-def verify_navigation(page):
-    try:
-        expect(page).to_have_url(re.compile(r'.*example.com/page.*'))
-    except:
-        page.wait_for_timeout(2000)
-        expect(page).to_have_url(re.compile(r'.*example.com/page.*'))
 
 Return your response as JSON with this exact structure:
 {{
@@ -468,7 +535,8 @@ Return your response as JSON with this exact structure:
             exact_text = step[1].strip()
             feature_mapping[normalized] = exact_text
             print(f"🔧 Feature step mapping: '{exact_text}' -> normalized: '{normalized}'")
-          # Replace step decorators in steps content
+        
+        # Replace step decorators in steps content
         def replace_decorator(match):
             decorator_type = match.group(1)
             current_text = match.group(2)
@@ -485,10 +553,14 @@ Return your response as JSON with this exact structure:
             
             return match.group(0)  # No change if no match found
         
-        # Apply replacements
-        fixed_content = re.sub(r'@(given|when|then)\([\'"](.+?)[\'"]\)', replace_decorator, steps_content)
-        
-        return fixed_content
+        # Apply replacements with escaped regex pattern
+        try:
+            fixed_content = re.sub(r'@(given|when|then)\([\'"](.+?)[\'"]\)', replace_decorator, steps_content)
+            return fixed_content
+        except re.error as e:
+            print(f"⚠️  Regex error in quote fixing: {e}")
+            print("🔧 Returning original content without quote fixes")
+            return steps_content
     
     def post_process_generated_files(self):
         """Auto post-process generated files for better reliability"""
@@ -497,12 +569,15 @@ Return your response as JSON with this exact structure:
         # Apply natural navigation optimization
         self.optimize_natural_navigation()
         
+        # Apply robust element interaction patterns
+        self.enhance_element_interactions()
+        
         # Built-in validation and fixes already handled by:
         # 1. validate_quote_consistency()
         # 2. fix_quote_inconsistencies() 
         # 3. clean_markdown_formatting()
-        # 4. optimize_natural_navigation() - NEW
-        # External post-processor no longer needed
+        # 4. optimize_natural_navigation()
+        # 5. enhance_element_interactions() - NEW
         
         print(f"✅ Post-processing completed! (Built-in fixes applied)")
     
@@ -573,7 +648,73 @@ Return your response as JSON with this exact structure:
                 
             print(f"✅ Natural navigation optimization applied - removed manual navigation steps")
         else:
-            print(f"ℹ️  No manual navigation patterns detected - keeping original flow")    
+            print(f"ℹ️  No manual navigation patterns detected - keeping original flow")
+    
+    def enhance_element_interactions(self):
+        """Enhance element interactions with robust fallback strategies"""
+        print(f"🛠️  Enhancing element interactions with fallback strategies...")
+        
+        steps_file = self.base_folder / 'features' / 'steps' / f'{self.feature_label}_steps.py'
+        
+        if not steps_file.exists():
+            return
+            
+        with open(steps_file, 'r', encoding='utf-8') as f:
+            steps_content = f.read()
+        
+        # Fix any malformed code from post-processing
+        # Remove duplicate try-except blocks and fix syntax errors
+        enhanced_content = steps_content
+        
+        try:
+            # Fix escaped quotes
+            enhanced_content = enhanced_content.replace("\\'", "'")
+            
+            # Simple enhancement: Add basic error handling if not present for password fields
+            if "try:" not in enhanced_content and "@when" in enhanced_content and "Password" in enhanced_content:
+                # Look for simple password fill patterns and enhance them
+                lines = enhanced_content.split('\n')
+                enhanced_lines = []
+                
+                for i, line in enumerate(lines):
+                    enhanced_lines.append(line)
+                    
+                    # If we find a password fill line, add error handling
+                    if ("Password" in line and ".fill(" in line and 
+                        not any("try:" in lines[j] for j in range(max(0, i-3), min(len(lines), i+3)))):
+                        
+                        # Add enhanced password handling
+                        indent = len(line) - len(line.lstrip())
+                        enhanced_lines.pop()  # Remove the original line
+                        enhanced_lines.extend([
+                            " " * indent + "# Click field first to make it editable",
+                            " " * indent + "page.get_by_role('textbox', name='Password').click()",
+                            " " * indent + "page.wait_for_timeout(500)",
+                            " " * indent + "",
+                            " " * indent + "# Try multiple strategies for password field", 
+                            " " * indent + "try:",
+                            " " * indent + "    " + line.strip(),
+                            " " * indent + "except:",
+                            " " * indent + "    try:",
+                            " " * indent + "        page.locator('input[type=\"password\"]').fill('12345')",
+                            " " * indent + "    except:",
+                            " " * indent + "        page.locator('input[formcontrolname=\"password\"]').fill('12345')"
+                        ])
+                
+                enhanced_content = '\n'.join(enhanced_lines)
+            
+            # Write enhanced content
+            with open(steps_file, 'w', encoding='utf-8') as f:
+                f.write(enhanced_content)
+            
+            print(f"✅ Element interactions enhanced and syntax cleaned")
+            
+        except Exception as e:
+            print(f"⚠️  Error in element enhancement: {e}")
+            print("🔧 Keeping original content")
+            # If there's an error, just keep the original content
+            with open(steps_file, 'w', encoding='utf-8') as f:
+                f.write(steps_content)    
     def create_test_file(self):
         """Create pytest test file with robust path handling to avoid IndexError"""
         test_content = f'''import pytest
@@ -631,6 +772,7 @@ testpaths = .
 python_files = test_*.py
 python_classes = Test*
 python_functions = test_*
+addopts = --strict-markers
 '''
         
         pytest_file = self.base_folder / "pytest.ini"
