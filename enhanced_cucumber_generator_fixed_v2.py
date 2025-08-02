@@ -136,7 +136,7 @@ def load_config():
         return json.load(f)
 
 def run_specific_feature(feature_label):
-    """Run tests for specific feature label"""
+    """Run tests for specific feature label with Allure and HTML reporting"""
     print(f"🧪 Running tests for feature: {{feature_label}}")
     
     # Find feature files with the label
@@ -158,16 +158,28 @@ def run_specific_feature(feature_label):
     
     print(f"🚀 Running: {{test_file}}")
     
-    # Create reports directory
+    # Create reports directories
     reports_dir = Path(__file__).parent / "reports"
-    reports_dir.mkdir(exist_ok=True)
+    allure_results_dir = reports_dir / "allure-results"
+    allure_report_dir = reports_dir / "allure-report"
     
-    # Run pytest with HTML report
+    reports_dir.mkdir(exist_ok=True)
+    allure_results_dir.mkdir(exist_ok=True)
+    allure_report_dir.mkdir(exist_ok=True)
+    
+    # Clean previous allure results
+    import shutil
+    if allure_results_dir.exists():
+        shutil.rmtree(allure_results_dir)
+    allure_results_dir.mkdir(exist_ok=True)
+    
+    # Run pytest with both HTML and Allure reports
     cmd = [
         "pytest", 
         str(test_file),
         "--html", str(reports_dir / f"report_{{feature_label}}.html"),
         "--self-contained-html",
+        "--alluredir", str(allure_results_dir),
         "-v", "--tb=short"
     ]
     
@@ -177,11 +189,40 @@ def run_specific_feature(feature_label):
         if result.stderr:
             print("Errors:", result.stderr)
         
+        # Generate Allure report
+        print("\\n📊 Generating Allure report...")
+        try:
+            # Check if allure command is available
+            allure_check = subprocess.run(["allure", "--version"], capture_output=True, text=True)
+            if allure_check.returncode == 0:
+                # Generate Allure HTML report
+                allure_cmd = [
+                    "allure", "generate", str(allure_results_dir), 
+                    "-o", str(allure_report_dir), "--clean"
+                ]
+                allure_result = subprocess.run(allure_cmd, capture_output=True, text=True)
+                
+                if allure_result.returncode == 0:
+                    print(f"✅ Allure report generated: {{allure_report_dir / 'index.html'}}")
+                    print(f"🌐 Open Allure report: allure serve {{allure_results_dir}}")
+                else:
+                    print(f"⚠️  Allure report generation failed: {{allure_result.stderr}}")
+            else:
+                print("⚠️  Allure CLI not found. Install with: npm install -g allure-commandline")
+                print(f"📊 Raw allure data available in: {{allure_results_dir}}")
+        except Exception as e:
+            print(f"⚠️  Could not generate Allure report: {{e}}")
+            print("💡 Install Allure CLI: npm install -g allure-commandline")
+        
         if result.returncode == 0:
-            print(f"✅ Tests passed! Report: {{reports_dir / f'report_{{feature_label}}.html'}}")
+            print(f"\\n✅ Tests passed!")
+            print(f"📄 HTML Report: {{reports_dir / f'report_{{feature_label}}.html'}}")
+            print(f"📊 Allure Results: {{allure_results_dir}}")
             return True
         else:
-            print(f"❌ Tests failed! Check report: {{reports_dir / f'report_{{feature_label}}.html'}}")
+            print(f"\\n❌ Tests failed!")
+            print(f"📄 HTML Report: {{reports_dir / f'report_{{feature_label}}.html'}}")
+            print(f"📊 Allure Results: {{allure_results_dir}}")
             return False
             
     except Exception as e:
@@ -210,6 +251,13 @@ if __name__ == "__main__":
     def get_python_executable(self):
         """Get the correct Python executable path for the current environment"""
         import sys
+        from pathlib import Path
+        
+        # First, check for venv in current working directory
+        current_dir = Path.cwd()
+        venv_python = current_dir / ".venv" / "bin" / "python"
+        if venv_python.exists():
+            return str(venv_python)
         
         # Check if we're in a virtual environment
         if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
@@ -224,8 +272,275 @@ if __name__ == "__main__":
             # Fallback to system Python
             return sys.executable
     
+    def analyze_script_context(self, script_content):
+        """Analyze the recorded script to determine context and generate dynamic instructions"""
+        context = {
+            "has_login": False,
+            "has_search": False,
+            "has_form": False,
+            "has_navigation": False,
+            "has_buttons": False,
+            "has_inputs": False,
+            "field_types": [],
+            "button_types": [],
+            "actions": []
+        }
+        
+        # Analyze script content for different patterns
+        if any(keyword in script_content.lower() for keyword in ['login', 'signin', 'sign in', 'password', 'email']):
+            context["has_login"] = True
+            context["actions"].append("authentication")
+            
+        if any(keyword in script_content.lower() for keyword in ['search', 'find', 'query']):
+            context["has_search"] = True
+            context["actions"].append("search")
+            
+        if any(keyword in script_content.lower() for keyword in ['form', 'submit', 'input', 'fill']):
+            context["has_form"] = True
+            context["actions"].append("form_interaction")
+            
+        if 'goto' in script_content.lower() or 'navigate' in script_content.lower():
+            context["has_navigation"] = True
+            context["actions"].append("navigation")
+            
+        if 'click' in script_content.lower():
+            context["has_buttons"] = True
+            context["actions"].append("button_interaction")
+            
+        if 'fill' in script_content.lower():
+            context["has_inputs"] = True
+            context["actions"].append("input_filling")
+        
+        # Detect field types
+        if 'password' in script_content.lower():
+            context["field_types"].append("password")
+        if 'email' in script_content.lower():
+            context["field_types"].append("email")
+        if 'text' in script_content.lower():
+            context["field_types"].append("text")
+        if 'search' in script_content.lower():
+            context["field_types"].append("search")
+            
+        # Detect button types
+        if any(keyword in script_content.lower() for keyword in ['submit', 'login', 'signin']):
+            context["button_types"].append("submit")
+        if any(keyword in script_content.lower() for keyword in ['search', 'find']):
+            context["button_types"].append("search")
+        if any(keyword in script_content.lower() for keyword in ['add', 'create', 'new']):
+            context["button_types"].append("action")
+            
+        return context
+    
+    def generate_dynamic_examples(self, context):
+        """Generate dynamic examples based on script context with Allure reporting"""
+        examples = []
+        
+        # Enhanced imports with Allure
+        examples.append("""
+from playwright.sync_api import expect
+from pytest_bdd import given, when, then
+import pytest
+import re
+import allure
+
+@allure.step("Navigate to the website")
+@given("User navigates to the website")
+def navigate_to_website(page):
+    page.goto('https://example.com')
+    page.wait_for_load_state('networkidle')""")
+        
+        # Dynamic examples based on context
+        if context["has_inputs"]:
+            if "email" in context["field_types"]:
+                examples.append("""
+@allure.step("Enter email: {email}")
+@when("User enters 'user@example.com' in the 'Email' textbox")
+def enter_email(page):
+    email = 'user@example.com'
+    allure.attach(email, name="Email Input", attachment_type=allure.attachment_type.TEXT)
+    page.get_by_role('textbox', name='Email').click()
+    page.wait_for_timeout(500)
+    try:
+        page.get_by_role('textbox', name='Email').fill(email)
+    except:
+        try:
+            page.locator('input[type="email"]').fill(email)
+        except:
+            page.locator('input[formcontrolname="email"]').fill(email)""")
+            
+            if "password" in context["field_types"]:
+                examples.append("""
+@allure.step("Enter password")
+@when("User enters 'password123' in the 'Password' textbox")
+def enter_password(page):
+    allure.attach("Password field interaction", name="Password Entry", attachment_type=allure.attachment_type.TEXT)
+    page.get_by_role('textbox', name='Password').click()
+    page.wait_for_timeout(500)
+    try:
+        page.get_by_role('textbox', name='Password').fill('password123')
+    except:
+        try:
+            page.locator('input[type="password"]').fill('password123')
+        except:
+            page.locator('input[formcontrolname="password"]').fill('password123')""")
+            
+            if "search" in context["field_types"]:
+                examples.append("""
+@allure.step("Search for: {search_term}")
+@when("User enters 'search term' in the search box")
+def enter_search_term(page):
+    search_term = 'search term'
+    allure.attach(search_term, name="Search Query", attachment_type=allure.attachment_type.TEXT)
+    page.get_by_role('textbox', name='Search').click()
+    page.wait_for_timeout(500)
+    try:
+        page.get_by_role('textbox', name='Search').fill(search_term)
+    except:
+        try:
+            page.locator('input[type="search"]').fill(search_term)
+        except:
+            page.locator('input[placeholder*="search"]').fill(search_term)""")
+        
+        if context["has_buttons"]:
+            if "submit" in context["button_types"] or context["has_login"]:
+                examples.append("""
+@allure.step("Click LOGIN button")
+@when("User clicks 'LOGIN'")
+def click_login_button(page):
+    allure.attach("Attempting login", name="Login Action", attachment_type=allure.attachment_type.TEXT)
+    try:
+        page.get_by_role('button', name='LOGIN').click()
+    except:
+        try:
+            page.locator('button:has-text("LOGIN")').click()
+        except:
+            page.locator('[type="submit"]').click()
+    page.wait_for_load_state('networkidle')
+    page.wait_for_timeout(5000)""")
+            
+            if "search" in context["button_types"]:
+                examples.append("""
+@allure.step("Click Search button")
+@when("User clicks 'Search'")
+def click_search_button(page):
+    allure.attach("Executing search", name="Search Action", attachment_type=allure.attachment_type.TEXT)
+    try:
+        page.get_by_role('button', name='Search').click()
+    except:
+        try:
+            page.locator('button:has-text("Search")').click()
+        except:
+            page.locator('[type="submit"]').click()
+    page.wait_for_load_state('networkidle')
+    page.wait_for_timeout(2000)""")
+        
+        # Verification examples with screenshots
+        examples.append("""
+@allure.step("Verify text is visible: {expected_text}")
+@then("'Expected Text' should be visible")
+def verify_text_visible(page):
+    expected_text = 'Expected Text'
+    allure.attach(expected_text, name="Expected Text", attachment_type=allure.attachment_type.TEXT)
+    try:
+        expect(page.get_by_text(expected_text, exact=True)).to_be_visible()
+        # Take screenshot on success
+        screenshot = page.screenshot()
+        allure.attach(screenshot, name="Verification Success", attachment_type=allure.attachment_type.PNG)
+    except:
+        # Take screenshot on failure
+        screenshot = page.screenshot()
+        allure.attach(screenshot, name="Verification Failed", attachment_type=allure.attachment_type.PNG)
+        page.wait_for_timeout(1500)
+        expect(page.get_by_text(expected_text, exact=True)).to_be_visible()""")
+        
+        if context["has_navigation"]:
+            examples.append("""
+@allure.step("Verify navigation to: {expected_url}")
+@then("User should navigate to 'https://example.com/page'")
+def verify_navigation(page):
+    expected_url = 'https://example.com/page'
+    allure.attach(expected_url, name="Expected URL", attachment_type=allure.attachment_type.TEXT)
+    allure.attach(page.url, name="Current URL", attachment_type=allure.attachment_type.TEXT)
+    try:
+        expect(page).to_have_url(re.compile(r'.*example.com/page.*'))
+        screenshot = page.screenshot()
+        allure.attach(screenshot, name="Navigation Success", attachment_type=allure.attachment_type.PNG)
+    except:
+        screenshot = page.screenshot()
+        allure.attach(screenshot, name="Navigation Failed", attachment_type=allure.attachment_type.PNG)
+        page.wait_for_timeout(2000)
+        expect(page).to_have_url(re.compile(r'.*example.com/page.*'))""")
+        
+        return "\n".join(examples)
+    
+    def generate_dynamic_instructions(self, context):
+        """Generate context-specific instructions"""
+        instructions = []
+        
+        # Base instruction
+        instructions.append("- For INPUT fields:")
+        instructions.append("  * ALWAYS click the field first: page.get_by_role('textbox', name='Field').click()")
+        instructions.append("  * Add small timeout: page.wait_for_timeout(500)")
+        instructions.append("  * Use multiple fallback strategies in try-catch blocks:")
+        
+        # Field-specific instructions
+        if "password" in context["field_types"]:
+            instructions.extend([
+                "  * For PASSWORD fields:",
+                "    1st: page.get_by_role('textbox', name='Password').fill('value')",
+                "    2nd: page.locator('input[type=\"password\"]').fill('value')",
+                "    3rd: page.locator('input[formcontrolname=\"password\"]').fill('value')"
+            ])
+        
+        if "email" in context["field_types"]:
+            instructions.extend([
+                "  * For EMAIL fields:",
+                "    1st: page.get_by_role('textbox', name='Email').fill('value')",
+                "    2nd: page.locator('input[type=\"email\"]').fill('value')",
+                "    3rd: page.locator('input[formcontrolname=\"email\"]').fill('value')"
+            ])
+        
+        if "search" in context["field_types"]:
+            instructions.extend([
+                "  * For SEARCH fields:",
+                "    1st: page.get_by_role('textbox', name='Search').fill('value')",
+                "    2nd: page.locator('input[type=\"search\"]').fill('value')",
+                "    3rd: page.locator('input[placeholder*=\"search\"]').fill('value')"
+            ])
+        
+        # Button instructions
+        instructions.append("\n- For BUTTON clicks:")
+        instructions.append("  * Use multiple selector strategies:")
+        
+        if "submit" in context["button_types"] or context["has_login"]:
+            instructions.extend([
+                "  * For SUBMIT/LOGIN buttons:",
+                "    1st: page.get_by_role('button', name='Button')",
+                "    2nd: page.locator('button:has-text(\"Button\")')",
+                "    3rd: page.locator('[type=\"submit\"]')",
+                "  * Add longer timeouts (5000ms) for authentication actions"
+            ])
+        
+        if "search" in context["button_types"]:
+            instructions.extend([
+                "  * For SEARCH buttons:",
+                "    1st: page.get_by_role('button', name='Search')",
+                "    2nd: page.locator('button:has-text(\"Search\")')",
+                "    3rd: page.locator('[type=\"submit\"]')"
+            ])
+        
+        # Action-specific instructions
+        if context["has_navigation"]:
+            instructions.extend([
+                "\n- For NAVIGATION:",
+                "  * Avoid manual navigation after form submissions",
+                "  * Trust application redirects after login/submit",
+                "  * Use longer timeouts after authentication"
+            ])
+        
+        return "\n".join(instructions)
+
     def record_script(self):
-        """Record script with Playwright Codegen"""
         print(f"\n🎬 Starting Playwright Codegen recording for '{self.feature_label}'...")
         print(f"🌐 Target URL: {self.website_url}")
         print("\n📝 Instructions:")
@@ -265,8 +580,17 @@ if __name__ == "__main__":
             # Read recorded script
             with open(recorded_file, "r", encoding='utf-8') as file:
                 script_content = file.read()
-                
-            # Enhanced prompt with strict text and quote consistency requirements
+            
+            # Analyze script context for dynamic prompt generation
+            context = self.analyze_script_context(script_content)
+            print(f"📊 Script analysis: {context}")
+            
+            dynamic_examples = self.generate_dynamic_examples(context)
+            dynamic_instructions = self.generate_dynamic_instructions(context)
+            
+            print(f"🎯 Generated {len(dynamic_examples.split('@'))-1} context-specific examples")
+            
+            # Enhanced prompt with dynamic content based on script analysis
             prompt_content = f"""Convert the following Playwright Python script into a Cucumber feature file (Gherkin syntax) and corresponding step definitions in Python. 
 
 ULTRA-CRITICAL REQUIREMENTS - FOLLOW EXACTLY:
@@ -290,26 +614,8 @@ ULTRA-CRITICAL REQUIREMENTS - FOLLOW EXACTLY:
    - Wrap critical assertions in try-catch blocks with retries
    - For heading visibility, add wait_for_timeout(3000) before retry
 
-4. SMART ELEMENT INTERACTION (CRITICAL NEW REQUIREMENT):
-   - For INPUT fields (especially password/sensitive fields):
-     * ALWAYS click the field first: page.get_by_role('textbox', name='Field').click()
-     * Add small timeout: page.wait_for_timeout(500)
-     * Use multiple fallback strategies in try-catch blocks:
-       1st: page.get_by_role('textbox', name='Field').fill('value')
-       2nd: page.locator('input[type="password"]').fill('value') (for password fields)
-       3rd: page.locator('input[formcontrolname="fieldname"]').fill('value')
-       4th: page.locator('input[name="fieldname"]').fill('value')
-   
-   - For BUTTON clicks:
-     * Use multiple selector strategies:
-       1st: page.get_by_role('button', name='Button')
-       2nd: page.locator('button:has-text("Button")')
-       3rd: page.locator('[type="submit"]') (for submit buttons)
-   
-   - DETECT FIELD TYPES from script:
-     * If locator contains 'password' or type="password": Use password-specific handling
-     * If locator contains 'email': Use email-specific handling
-     * If locator contains 'submit' or 'login' button: Use form submission handling
+4. CONTEXT-AWARE ELEMENT INTERACTION (DYNAMIC):
+{dynamic_instructions}
 
 5. NATURAL NAVIGATION STRATEGY (CRITICAL):
    - DETECT POST-ACTION NAVIGATION: If script shows page.goto() immediately after login/submit/click, this suggests natural redirect
@@ -334,62 +640,8 @@ ULTRA-CRITICAL REQUIREMENTS - FOLLOW EXACTLY:
 Playwright Script:
 {script_content}
 
-EXAMPLE OUTPUT FORMAT with ROBUST ELEMENT HANDLING:
-
-Step definitions should look EXACTLY like this (NO MARKDOWN):
-from playwright.sync_api import expect
-from pytest_bdd import given, when, then
-import pytest
-import re
-
-@given("User navigates to the website")
-def navigate_to_website(page):
-    page.goto('https://example.com')
-    page.wait_for_load_state('networkidle')
-
-@when("User enters 'email@test.com' in the 'Email' textbox")
-def enter_email(page):
-    page.get_by_role('textbox', name='Email').click()
-    page.wait_for_timeout(500)
-    try:
-        page.get_by_role('textbox', name='Email').fill('email@test.com')
-    except:
-        try:
-            page.locator('input[type="email"]').fill('email@test.com')
-        except:
-            page.locator('input[formcontrolname="email"]').fill('email@test.com')
-
-@when("User enters 'password123' in the 'Password' textbox")
-def enter_password(page):
-    page.get_by_role('textbox', name='Password').click()
-    page.wait_for_timeout(500)
-    try:
-        page.get_by_role('textbox', name='Password').fill('password123')
-    except:
-        try:
-            page.locator('input[type="password"]').fill('password123')
-        except:
-            page.locator('input[formcontrolname="password"]').fill('password123')
-
-@when("User clicks 'LOGIN'")
-def click_login(page):
-    try:
-        page.get_by_role('button', name='LOGIN').click()
-    except:
-        try:
-            page.locator('button:has-text("LOGIN")').click()
-        except:
-            page.locator('[type="submit"]').click()
-    page.wait_for_load_state('networkidle')
-    page.wait_for_timeout(5000)
-
-@then("'Result' should be visible")
-def verify_result(page):
-    try:
-        expect(page.get_by_text('Result', exact=True)).to_be_visible()
-    except:
-        page.wait_for_timeout(1500)
-        expect(page.get_by_text('Result', exact=True)).to_be_visible()
+CONTEXT-SPECIFIC EXAMPLES based on your script analysis:
+{dynamic_examples}
 
 Return your response as JSON with this exact structure:
 {{
@@ -763,7 +1015,7 @@ def page(context):
         print(f"✅ Test file: {test_file}")
     
     def create_pytest_config(self):
-        """Create pytest.ini configuration file to avoid path issues"""
+        """Create pytest.ini configuration file with Allure reporting support"""
         pytest_config = f'''[tool:pytest]
 bdd_features_base_dir = features
 markers =
@@ -772,7 +1024,7 @@ testpaths = .
 python_files = test_*.py
 python_classes = Test*
 python_functions = test_*
-addopts = --strict-markers
+addopts = --strict-markers --alluredir=reports/allure-results --html=reports/report_{self.feature_label}.html --self-contained-html
 '''
         
         pytest_file = self.base_folder / "pytest.ini"

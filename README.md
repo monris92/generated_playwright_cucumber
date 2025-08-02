@@ -14,8 +14,9 @@ A fully automated, **AI-powered workflow** that converts Playwright scripts into
 - **🧠 AI-Powered Intelligence**: Mistral AI integration for intelligent code generation  
 - **🔧 Robust Automation**: Built-in quote consistency, path handling, and error fixing
 - **🎯 Natural Navigation**: Automatic optimization for realistic user flows
-- **📊 Production Quality**: Cross-platform compatibility with comprehensive validation
+- **📊 Professional Reporting**: Allure integration with beautiful visual reports and screenshots
 - **⚡ Performance Optimized**: Enhanced timeouts and fallback strategies
+- **🎭 Dynamic Context Analysis**: Smart prompt generation based on script content
 
 ## 🏗️ Current Architecture
 
@@ -30,22 +31,151 @@ A fully automated, **AI-powered workflow** that converts Playwright scripts into
 
 🔧 CURRENT COMPONENTS (Simplified & Production-Ready)
 ├── enhanced_cucumber_generator_fixed_v2.py  # Main generator with all features built-in
+├── allure_runner.py                         # Advanced Allure reporting runner (NEW)
 ├── test_quote_consistency.py               # Optional validation utility
-├── requirements.txt                        # All dependencies
+├── requirements.txt                        # All dependencies (includes Allure)
+├── ALLURE_SETUP.md                         # Complete Allure setup guide (NEW)
 └── README.md                               # Complete documentation
+```
+
+## � Reporting Options
+
+### 🎯 Allure Reporting (RECOMMENDED - Professional Grade)
+
+The generator now supports **Allure reporting** for beautiful, professional test reports with advanced features:
+
+#### Features:
+- ✅ **Visual Dashboard** - Professional overview of all test results
+- ✅ **Timeline View** - Step-by-step execution timeline with screenshots
+- ✅ **Screenshots** - Automatic capture on success/failure with attachments
+- ✅ **Environment Info** - Browser, Python version, execution metadata
+- ✅ **Historical Trends** - Track test stability over time
+- ✅ **Categories** - Smart grouping of failures by type
+- ✅ **Interactive Server** - Real-time browsing with localhost server
+
+#### Prerequisites:
+```bash
+# 1. Install Allure dependencies (included in requirements.txt)
+pip install allure-pytest allure-python-commons
+
+# 2. Install Java (required for Allure CLI)
+# macOS:
+brew install openjdk
+export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
+
+# Ubuntu/Debian:
+sudo apt update && sudo apt install openjdk-11-jdk
+
+# Windows:
+# Download from: https://adoptopenjdk.net/
+
+# 3. Install Allure CLI
+npm install -g allure-commandline
+# OR
+brew install allure  # macOS only
+```
+
+> 📚 **Complete Setup Guide**: See [ALLURE_SETUP.md](ALLURE_SETUP.md) for detailed installation instructions for all platforms.
+
+#### Usage:
+
+**Option 1: Advanced Allure Runner (Recommended)**
+```bash
+# Run with beautiful Allure reporting
+python allure_runner.py project_folder feature_name
+
+# Example:
+python allure_runner.py my_test login
+```
+
+**Option 2: Standard Runner (HTML + Allure)**
+```bash
+cd project_folder
+python run_tests.py feature_name
+```
+
+#### Generated Reports:
+- 📄 **HTML Report**: `reports/report_feature.html` (basic)
+- 📊 **Allure Results**: `reports/allure-results/` (raw data)
+- 🎯 **Allure Report**: `reports/allure-report/index.html` (interactive)
+- 🖥️ **Interactive Server**: `allure serve reports/allure-results`
+
+### 📋 Basic HTML Reporting
+
+For simple reporting without Allure setup:
+```bash
+cd project_folder
+python run_tests.py feature_name
+# Report: reports/report_feature.html
+```
+
+## 🎨 Allure Report Showcase
+
+### What You Get with Allure Integration:
+
+#### 📊 **Dashboard Overview**
+- Beautiful summary with pass/fail statistics
+- Execution trends and duration graphs
+- Environment information display
+- Categories of failures for quick analysis
+
+#### 🔍 **Detailed Test Results**
+- Step-by-step execution breakdown with timings
+- Automatic screenshots on each verification step
+- Input/output data attachments for debugging
+- Stack traces with syntax highlighting
+
+#### 📈 **Advanced Analytics**
+- Historical test execution trends
+- Flaky test detection and reporting
+- Performance metrics and timing analysis
+- Test duration distribution graphs
+
+#### 🎯 **Interactive Features**
+- Real-time filtering by status/category
+- Search functionality across all test data
+- Expandable test details with media attachments
+- Timeline view of test execution flow
+
+#### Example Generated Features:
+```python
+@allure.step("Enter email: {email}")
+@when("User enters 'user@example.com' in the 'Email' textbox")
+def enter_email(page):
+    email = 'user@example.com'
+    allure.attach(email, name="Email Input", attachment_type=allure.attachment_type.TEXT)
+    # Screenshots automatically captured on success/failure
+    screenshot = page.screenshot()
+    allure.attach(screenshot, name="Email Entry", attachment_type=allure.attachment_type.PNG)
 ```
 
 ## 🚀 Quick Start (3 Easy Steps)
 
 ### Step 1: Install Dependencies (REQUIRED FIRST TIME)
 ```bash
+# Install Python dependencies
 pip install -r requirements.txt
 playwright install
+
+# Optional: Install Allure for professional reporting
+brew install openjdk  # or sudo apt install openjdk-11-jdk
+npm install -g allure-commandline
+export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"  # macOS
 ```
 
 ### Step 2: Generate BDD Project  
 ```bash
 python enhanced_cucumber_generator_fixed_v2.py
+```
+
+### Step 3: Run Tests with Professional Reporting
+```bash
+# Option A: Advanced Allure runner (recommended)
+python allure_runner.py your_project feature_name
+
+# Option B: Basic runner
+cd your_project
+python run_tests.py feature_name
 ```
 
 ### Step 3: Run Generated Tests
@@ -313,6 +443,35 @@ playwright install
 - Check API key validity
 - Verify internet connection
 - Check API quota/limits
+
+### 🎯 Allure Reporting Troubleshooting
+
+> 📚 **Complete Troubleshooting Guide**: See [ALLURE_SETUP.md](ALLURE_SETUP.md) for comprehensive troubleshooting steps.
+
+**❌ "Unable to locate a Java Runtime"**
+```bash
+# Install Java
+# macOS:
+brew install openjdk
+export PATH="/opt/homebrew/opt/openjdk/bin:$PATH"
+
+# Ubuntu/Debian:
+sudo apt update && sudo apt install openjdk-11-jdk
+
+# Windows:
+# Download from: https://adoptopenjdk.net/
+```
+
+**❌ "allure: command not found"**
+```bash
+# Install Allure CLI
+npm install -g allure-commandline
+# OR
+brew install allure  # macOS only
+
+# Verify installation
+allure --version
+```
 
 **Playwright issues:**
 - Ensure browsers are installed: `playwright install`
