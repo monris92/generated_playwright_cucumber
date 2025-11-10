@@ -1,0 +1,15 @@
+{
+  "project_name": "Test_login",
+  "created_date": "2025-11-10T16:11:20.702053",
+  "website_url": "https://chronicle.rip",
+  "feature_label": "login",
+  "mistral_config": {
+    "model": "mistral-large-latest",
+    "temperature": 0.7,
+    "max_tokens": 4096
+  },
+  "playwright_config": {
+    "headless": false,
+    "timeout": 30000
+  }
+}

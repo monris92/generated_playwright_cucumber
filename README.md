@@ -1,5 +1,29 @@
 # 🎭 Playwright to Cucumber BDD Generator v2.0
 
+## 🚀 Quick Start (RECOMMENDED)
+
+**For the fastest setup with automatic error handling:**
+```bash
+./run_fixed.sh
+```
+
+**To test your setup:**
+```bash
+python3 test_playwright_detection.py
+```
+
+**Manual setup (if needed):**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install playwright requests
+playwright install
+python enhanced_cucumber_generator_fixed_v2.py
+```
+
+⚠️ **Having issues?** Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+---
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![Python](https://img.shields.io/badge/python-3.8%2B-green)
@@ -11,11 +35,14 @@ A fully automated, **AI-powered workflow** that converts Playwright scripts into
 ### ✨ Key Features
 
 - **🚀 Zero Manual Intervention**: Immediately executable BDD projects out of the box
-- **🧠 AI-Powered Intelligence**: Mistral AI integration for intelligent code generation  
-- **🔧 Robust Automation**: Built-in quote consistency, path handling, and error fixing
+- **🧠 AI-Powered Intelligence**: Mistral AI integration with ultra-optimized prompts  
+- **🔧 Robust Automation**: Built-in quote consistency, syntax validation, and error fixing
 - **🎯 Natural Navigation**: Automatic optimization for realistic user flows
-- **📊 Production Quality**: Cross-platform compatibility with comprehensive validation
+- **📊 Production Quality**: Multi-layer validation with comprehensive error prevention
 - **⚡ Performance Optimized**: Enhanced timeouts and fallback strategies
+- **🛡️ Quote Consistency**: Automatic detection and fixing of quote mismatches
+- **🔍 Enhanced Validation**: Python syntax checking and typo detection
+- **📝 Comprehensive Logging**: Detailed debugging and error tracking
 
 ## 🏗️ Current Architecture
 
@@ -28,10 +55,13 @@ A fully automated, **AI-powered workflow** that converts Playwright scripts into
 ├── Validate: Quote Consistency + Syntax Check
 └── Output: Production-Ready BDD Project
 
-🔧 CURRENT COMPONENTS (Simplified & Production-Ready)
-├── enhanced_cucumber_generator_fixed_v2.py  # Main generator with all features built-in
-├── test_quote_consistency.py               # Optional validation utility
+🔧 CURRENT COMPONENTS (Enhanced v2.1)
+├── enhanced_cucumber_generator_fixed_v2.py  # Main generator with quote consistency fixes
+├── test_quote_consistency.py               # Validation utility  
+├── test_improvements.py                    # Test suite for new features
 ├── requirements.txt                        # All dependencies
+├── IMPROVEMENTS.md                         # Detailed improvement documentation
+├── TROUBLESHOOTING.md                      # Complete troubleshooting guide
 └── README.md                               # Complete documentation
 ```
 
