@@ -1,65 +1,61 @@
 #!/bin/bash
 
-# QUICK FIX - Jalankan generator dengan virtual environment yang benar
-# Gunakan ini jika error "playwright not found"
+# Quick Start Script - Run the Cucumber Generator with Virtual Environment
+# Use this if you get "playwright not found" errors
 
-echo "🔧 QUICK FIX - Virtual Environment Generator"
-echo "============================================"
+echo "🎭 Playwright to Cucumber BDD Generator"
+echo "========================================"
 
-# Get the directory where this script is located
+# Get script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-echo "📍 Current directory: $SCRIPT_DIR"
+echo "📍 Working directory: $SCRIPT_DIR"
 
-# Check virtual environment
+# Check for virtual environment
 if [ ! -d "venv" ]; then
-    echo "❌ Virtual environment tidak ditemukan!"
-    echo "🔧 Menjalankan setup..."
+    echo "❌ Virtual environment not found!"
+    echo "🔧 Running setup..."
     if [ -f "setup_env.sh" ]; then
         ./setup_env.sh
     else
-        echo "❌ setup_env.sh tidak ditemukan!"
+        echo "❌ setup_env.sh not found!"
+        echo "💡 Please run: pip install -r requirements.txt && playwright install"
         exit 1
     fi
 fi
 
-# Use absolute path for virtual environment
+# Set paths
 VENV_PYTHON="$SCRIPT_DIR/venv/bin/python"
-VENV_PLAYWRIGHT="$SCRIPT_DIR/venv/bin/playwright"
 
-echo "🔍 Checking paths:"
-echo "   Python: $VENV_PYTHON"
-echo "   Playwright: $VENV_PLAYWRIGHT"
+echo "🔍 Using Python: $VENV_PYTHON"
 
-# Verify paths exist
+# Verify Python exists
 if [ ! -f "$VENV_PYTHON" ]; then
-    echo "❌ Python tidak ditemukan di virtual environment!"
+    echo "❌ Python not found in virtual environment!"
     exit 1
 fi
 
-if [ ! -f "$VENV_PLAYWRIGHT" ]; then
-    echo "❌ Playwright tidak ditemukan di virtual environment!"
-    echo "🔧 Mencoba install..."
+# Verify Playwright is available
+if ! "$VENV_PYTHON" -m playwright --help > /dev/null 2>&1; then
+    echo "❌ Playwright not found!"
+    echo "🔧 Installing Playwright..."
     "$VENV_PYTHON" -m pip install playwright
     "$VENV_PYTHON" -m playwright install
-    
-    # Verify installation
+
     if "$VENV_PYTHON" -m playwright --help > /dev/null 2>&1; then
-        echo "✅ Playwright berhasil diinstall!"
+        echo "✅ Playwright installed successfully!"
     else
-        echo "❌ Gagal install Playwright. Silakan cek koneksi internet dan coba lagi."
+        echo "❌ Failed to install Playwright. Check your internet connection."
         exit 1
     fi
 fi
 
 # Run the generator
-echo "🎭 Menjalankan generator dengan virtual environment..."
-echo "💡 Tip: Jika masih ada error, pastikan:"
-echo "   - Koneksi internet stabil untuk download browser"
-echo "   - Folder memiliki permission yang cukup"
 echo ""
-"$VENV_PYTHON" enhanced_cucumber_generator_fixed_v2.py
+echo "🚀 Starting Cucumber Generator..."
+echo ""
+"$VENV_PYTHON" cucumber_generator.py
 
 echo ""
-echo "✅ Generator selesai! Periksa file yang dihasilkan di folder project Anda."
+echo "✅ Generator finished! Check your project folder for generated tests."

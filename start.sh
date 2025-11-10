@@ -1,40 +1,38 @@
 #!/bin/bash
 
-# Quick start script - Aktifkan virtual environment dan jalankan generator
-# Author: Playwright to Cucumber Generator
-# Date: $(date +"%Y-%m-%d")
+# Quick Start Script
+# Activates virtual environment and runs the generator
 
-echo "🚀 QUICK START - Playwright to Cucumber Generator"
-echo "================================================="
+echo "🚀 Quick Start - Playwright to Cucumber BDD Generator"
+echo "======================================================"
 
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
-    echo "❌ Virtual environment belum ada! Jalankan setup_env.sh terlebih dahulu"
-    echo "   Cara: ./setup_env.sh"
+    echo "❌ Virtual environment not found! Run setup first"
+    echo "   Command: ./setup_env.sh"
     exit 1
 fi
 
-# Check if Python script exists
-if [ ! -f "enhanced_cucumber_generator_fixed_v2.py" ]; then
-    echo "❌ File enhanced_cucumber_generator_fixed_v2.py tidak ditemukan!"
+# Check if script exists
+if [ ! -f "cucumber_generator.py" ]; then
+    echo "❌ cucumber_generator.py not found!"
     exit 1
 fi
 
 # Activate virtual environment
-echo "📦 Mengaktifkan virtual environment..."
+echo "📦 Activating virtual environment..."
 source venv/bin/activate
 
 # Check if playwright is available
 if ! command -v playwright &> /dev/null; then
-    echo "❌ Playwright tidak ditemukan di virtual environment!"
-    echo "🔧 Mencoba install ulang..."
+    echo "❌ Playwright not found in virtual environment!"
+    echo "🔧 Installing..."
     pip install playwright
     playwright install
 fi
 
-echo "🎭 Menjalankan Playwright to Cucumber Generator..."
+echo "🎭 Starting Playwright to Cucumber Generator..."
 echo ""
-echo "💡 PENTING: Pastikan menggunakan virtual environment!"
-echo "   Current Python: $(which python)"
+echo "💡 Using Python: $(which python)"
 echo ""
-python enhanced_cucumber_generator_fixed_v2.py
+python cucumber_generator.py
