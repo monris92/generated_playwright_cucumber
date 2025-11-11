@@ -209,9 +209,11 @@ class SimpleRecorder:
             enhancer.enhance_in_place(marker=marker)
 
             print("✅ Test enhanced with:")
-            print("   • Wait after login buttons")
+            print("   • Network idle waits after page.goto()")
+            print("   • Wait strategies before ALL button clicks")
+            print("   • Element visibility and ready checks")
+            print("   • Smart delays for animations/dynamic content")
             print("   • URL validation instead of redundant page.goto()")
-            print("   • Element visibility waits")
             print(f"   • Pytest marker: @pytest.mark.{marker}")
 
         except Exception as e:

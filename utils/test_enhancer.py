@@ -2,6 +2,8 @@
 """
 Playwright Test Enhancer
 Automatically fixes common issues in recorded Playwright tests:
+- Adds network idle waits after page.goto()
+- Adds wait strategies before all button clicks
 - Adds waits after login buttons
 - Converts page.goto() after login to URL validation
 - Adds element visibility waits
@@ -91,6 +93,31 @@ class TestEnhancer:
                 enhanced.append(f"@pytest.mark.{marker}")
                 marker_added = True
 
+            # Add wait after page.goto() for network idle
+            if self._is_goto_line(line):
+                enhanced.append(line)
+                indent = self._get_indent(line)
+                enhanced.append("")
+                enhanced.append(f"{indent}# Wait for page to fully load")
+                enhanced.append(f"{indent}page.wait_for_load_state('load')")
+                enhanced.append(f"{indent}page.wait_for_load_state('networkidle')")
+                print(f"  📍 Added network idle wait after page.goto() at line {i+1}")
+                i += 1
+                continue
+
+            # Add wait strategies before ANY button click
+            if self._is_button_click(line) and not self._already_has_wait_before(enhanced):
+                indent = self._get_indent(line)
+                button_locator = self._extract_button_locator(line)
+
+                if button_locator:
+                    print(f"  📍 Found button click at line {i+1}")
+                    enhanced.append("")
+                    enhanced.append(f"{indent}# Wait for button to be ready")
+                    enhanced.append(f"{indent}page.wait_for_load_state('networkidle', timeout=10000)")
+                    enhanced.append(f"{indent}{button_locator}.wait_for(state='visible', timeout=10000)")
+                    enhanced.append(f"{indent}page.wait_for_timeout(300)  # Small delay for animations")
+
             enhanced.append(line)
 
             # Check if this line is a login button click
@@ -101,7 +128,8 @@ class TestEnhancer:
                 enhanced.append("")
                 enhanced.append(f"{indent}# Wait for navigation after login")
                 enhanced.append(f"{indent}page.wait_for_load_state('load')")
-                enhanced.append(f"{indent}page.wait_for_timeout(2000)  # Wait for dynamic content")
+                enhanced.append(f"{indent}page.wait_for_load_state('networkidle')")
+                enhanced.append(f"{indent}page.wait_for_timeout(1000)  # Wait for dynamic content")
 
                 # Check if next non-empty line is page.goto()
                 next_line_idx = self._find_next_code_line(lines, i + 1)
@@ -116,7 +144,8 @@ class TestEnhancer:
                         url_path = self._extract_url_path(url)
                         enhanced.append(f'{indent}page.wait_for_url("**{url_path}", timeout=15000)')
                         enhanced.append(f"{indent}page.wait_for_load_state('load')")
-                        enhanced.append(f"{indent}page.wait_for_timeout(2000)")
+                        enhanced.append(f"{indent}page.wait_for_load_state('networkidle')")
+                        enhanced.append(f"{indent}page.wait_for_timeout(1000)")
                         enhanced.append("")
                         enhanced.append(f"{indent}# Validate we're on the correct page")
                         enhanced.append(f'{indent}expect(page).to_have_url("{url}")')
@@ -138,6 +167,27 @@ class TestEnhancer:
             i += 1
 
         return enhanced
+
+    def _is_button_click(self, line):
+        """Check if line is any button click"""
+        return '.click()' in line and 'page.get_by_role("button"' in line
+
+    def _extract_button_locator(self, line):
+        """Extract button locator from click line"""
+        # Extract everything before .click()
+        match = re.search(r'(page\.get_by_role\("button"[^)]+\)(?:\.[^)]+\))*)', line)
+        if match:
+            return match.group(1)
+        return None
+
+    def _already_has_wait_before(self, enhanced):
+        """Check if previous lines already have wait statements"""
+        # Check last 5 lines for wait statements
+        check_lines = enhanced[-5:] if len(enhanced) >= 5 else enhanced
+        for line in check_lines:
+            if 'wait_for' in line or 'page.wait_for_load_state' in line:
+                return True
+        return False
 
     def _is_login_click(self, line):
         """Check if line is a login button click"""
@@ -197,15 +247,69 @@ class TestEnhancer:
 
 def main():
     """Command line interface"""
-    if len(sys.argv) < 2:
-        print("Usage: python test_enhancer.py <test_file.py> [--in-place]")
-        print("\nExamples:")
-        print("  python test_enhancer.py tests/login.py")
-        print("  python test_enhancer.py tests/login.py --in-place")
-        sys.exit(1)
+    print("🔧 Playwright Test Enhancer")
+    print("=" * 70)
+    print("\nEnhancements applied:")
+    print("  ✓ Network idle waits after page.goto()")
+    print("  ✓ Wait strategies before all button clicks")
+    print("  ✓ Element visibility checks")
+    print("  ✓ Smart waits for animations and dynamic content")
+    print()
 
-    test_file = sys.argv[1]
-    in_place = '--in-place' in sys.argv
+    # Interactive mode if no arguments
+    if len(sys.argv) < 2:
+        # Try to find available test files
+        import glob
+        test_files = []
+        patterns = ['e2e/**/tests/*_test.py', 'tests/*_test.py', '*_test.py']
+        for pattern in patterns:
+            test_files.extend(glob.glob(pattern, recursive=True))
+
+        if test_files:
+            print("📂 Available test files:")
+            print()
+            for i, file in enumerate(test_files, 1):
+                print(f"  {i:2d}. {file}")
+            print()
+            print("  0. Exit")
+            print()
+
+            while True:
+                try:
+                    choice = input("Select test file to enhance (number): ").strip()
+                    if choice == '0':
+                        print("👋 Bye!")
+                        sys.exit(0)
+
+                    idx = int(choice) - 1
+                    if 0 <= idx < len(test_files):
+                        test_file = test_files[idx]
+                        break
+                    else:
+                        print("❌ Invalid choice. Try again.")
+                except (ValueError, KeyboardInterrupt):
+                    print("\n👋 Bye!")
+                    sys.exit(0)
+
+            # Ask if in-place
+            print()
+            modify_choice = input("Modify file in-place? [Y/n]: ").strip().lower()
+            in_place = modify_choice != 'n'
+
+        else:
+            print("❌ No test files found.")
+            print("\nUsage: python test_enhancer.py <test_file.py> [--in-place]")
+            print("\nExamples:")
+            print("  python test_enhancer.py e2e/p0_smoke/login/tests/login_test.py --in-place")
+            print("  python test_enhancer.py tests/checkout_test.py")
+            print("\nOptions:")
+            print("  --in-place    Modify file in place (default: create .enhanced.py)")
+            sys.exit(1)
+
+    else:
+        # Command line mode
+        test_file = sys.argv[1]
+        in_place = '--in-place' in sys.argv
 
     try:
         enhancer = TestEnhancer(test_file)
