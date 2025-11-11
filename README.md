@@ -1,6 +1,6 @@
-# Playwright Test Tools
+# Playwright E2E Test Tools
 
-Kumpulan tools untuk merekam dan menghasilkan automated tests menggunakan Playwright.
+Kumpulan tools untuk merekam dan menjalankan automated tests menggunakan Playwright.
 
 ## Quick Start
 
@@ -9,41 +9,41 @@ Kumpulan tools untuk merekam dan menghasilkan automated tests menggunakan Playwr
 ./setup_env.sh
 ```
 
-### 2. Pilih Tool yang Sesuai
+### 2. Jalankan Test Interaktif (Recommended)
+Tool utama untuk merekam dan menjalankan test:
+```bash
+python3 run_tests_interactive.py
+```
 
-#### Simple Recorder (Direkomendasikan)
+### 3. Atau Rekam Test Manual
 Tool sederhana untuk merekam test Playwright:
 ```bash
 python3 simple_recorder.py
-```
-
-#### Cucumber BDD Generator (Advanced)
-Menghasilkan test dalam format Cucumber BDD dengan AI:
-```bash
-python3 cucumber_generator.py
 ```
 
 ## Dokumentasi
 
 Dokumentasi lengkap tersedia di folder `docs/`:
 
-- **[WHICH_ONE.md](docs/WHICH_ONE.md)** - Panduan memilih tool yang tepat
-- **[SIMPLE_README.md](docs/SIMPLE_README.md)** - Dokumentasi Simple Recorder
-- **[FULL_README.md](docs/FULL_README.md)** - Dokumentasi lengkap Cucumber Generator
+- **[QUICK_START.md](docs/QUICK_START.md)** - Panduan quick start
+- **[E2E_SYSTEM_README.md](docs/E2E_SYSTEM_README.md)** - Dokumentasi sistem E2E
+- **[ENHANCEMENT_GUIDE.md](docs/ENHANCEMENT_GUIDE.md)** - Panduan enhancement
+- **[FULL_README.md](docs/FULL_README.md)** - Dokumentasi lengkap
 
 ## Struktur File
 
 ```
 .
-├── simple_recorder.py          # Simple test recorder
-├── cucumber_generator.py       # Cucumber BDD generator
-├── setup_env.sh               # Script setup environment
-├── requirements.txt           # Dependencies untuk Cucumber generator
-├── requirements_simple.txt    # Dependencies untuk Simple recorder
-└── docs/                      # Dokumentasi
-    ├── WHICH_ONE.md          # Perbandingan tools
-    ├── SIMPLE_README.md      # Panduan Simple Recorder
-    └── FULL_README.md        # Panduan lengkap Cucumber
+├── run_tests_interactive.py    # Test runner interaktif (MAIN)
+├── run_tests.py               # Test runner non-interaktif
+├── simple_recorder.py         # Simple test recorder
+├── setup_env.sh              # Script setup environment
+├── run.sh                    # Quick run script
+├── requirements.txt          # Dependencies
+├── docs/                     # Dokumentasi lengkap
+├── e2e/                      # E2E test files
+└── utils/                    # Utility scripts
+    └── test_enhancer.py      # Test enhancer (auto-fix errors)
 ```
 
 ## Requirements

@@ -200,7 +200,7 @@ class SimpleRecorder:
 
         try:
             # Import the enhancer
-            from test_enhancer import TestEnhancer
+            from utils.test_enhancer import TestEnhancer
 
             # Get priority marker
             marker = self.PRIORITIES[self.priority]['marker']
