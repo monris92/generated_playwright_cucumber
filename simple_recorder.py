@@ -15,10 +15,33 @@ from datetime import datetime
 class SimpleRecorder:
     """Simple test recorder - record once, run anytime"""
 
+    # Test priority definitions
+    PRIORITIES = {
+        'p0': {
+            'name': 'Smoke Test',
+            'description': 'Critical features that must pass before release',
+            'marker': 'smoke',
+            'folder': 'p0-smoke_test'
+        },
+        'p1': {
+            'name': 'Regression',
+            'description': 'Important features, run on every build',
+            'marker': 'regression',
+            'folder': 'p1-regression'
+        },
+        'p2': {
+            'name': 'Exploratory',
+            'description': 'Edge cases, UI validation, nice-to-have tests',
+            'marker': 'exploratory',
+            'folder': 'p2-exploratory'
+        }
+    }
+
     def __init__(self):
         self.base_folder = None
         self.test_name = None
         self.website_url = None
+        self.priority = None
 
     def run(self):
         """Main workflow"""
@@ -39,6 +62,9 @@ class SimpleRecorder:
         if not recorded_file:
             return False
 
+        # Enhance the test (add waits, fix common issues)
+        self.enhance_test(recorded_file)
+
         # Make it runnable
         self.create_test_runner(recorded_file)
 
@@ -48,13 +74,36 @@ class SimpleRecorder:
 
     def get_inputs(self):
         """Get user inputs"""
-        # Get folder
-        folder = input("📁 Where to save tests? (press Enter for 'my_tests'): ").strip()
-        if not folder:
-            folder = "my_tests"
+        # Use e2e folder by default (skip question if it exists)
+        self.base_folder = Path("e2e").absolute()
 
-        self.base_folder = Path(folder).absolute()
-        print(f"✅ Tests will be saved in: {self.base_folder}")
+        if not self.base_folder.exists():
+            # Only ask if e2e doesn't exist yet
+            folder = input("📁 Base test folder? (press Enter for 'e2e'): ").strip()
+            if not folder:
+                folder = "e2e"
+            self.base_folder = Path(folder).absolute()
+
+        print(f"✅ Base folder: {self.base_folder}")
+
+        # Get test priority
+        print("\n📊 Test Priority:")
+        print("   1. P0 - Smoke Test (Critical: login, checkout, core flows)")
+        print("   2. P1 - Regression (Important: CRUD, search, filters)")
+        print("   3. P2 - Exploratory (Nice-to-have: edge cases, UI validation)")
+
+        while True:
+            choice = input("Choose priority [1-3] (default: 2): ").strip()
+            if not choice:
+                choice = '2'
+
+            if choice in ['1', '2', '3']:
+                priority_map = {'1': 'p0', '2': 'p1', '3': 'p2'}
+                self.priority = priority_map[choice]
+                priority_info = self.PRIORITIES[self.priority]
+                print(f"✅ Selected: {self.priority.upper()} - {priority_info['name']}")
+                break
+            print("❌ Please enter 1, 2, or 3")
 
         # Get test name
         while True:
@@ -73,26 +122,39 @@ class SimpleRecorder:
             print("❌ URL must start with http:// or https://")
 
     def create_structure(self):
-        """Create folder structure"""
+        """Create folder structure with priority-based organization"""
         print(f"\n📂 Creating test structure...")
+
+        # Get priority folder info
+        priority_info = self.PRIORITIES[self.priority]
+        priority_folder = self.base_folder / priority_info['folder']
+
+        # Create test-specific folder
+        test_folder = priority_folder / self.test_name
 
         # Create folders
         folders = [
             self.base_folder,
-            self.base_folder / "tests",
-            self.base_folder / "reports"
+            priority_folder,
+            test_folder,
+            test_folder / "tests",
+            test_folder / "reports"
         ]
 
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
 
-        print("✅ Folders created")
+        # Note: We don't create __init__.py to avoid import conflicts with pytest
+        # pytest will discover tests without __init__.py files
+
+        print(f"✅ Folders created in {priority_info['folder']}/{self.test_name}/")
 
     def record_test(self):
         """Record the test"""
         print("\n🎬 RECORDING")
         print("-" * 70)
         print(f"🌐 Target: {self.website_url}")
+        print(f"📊 Priority: {self.priority.upper()} - {self.PRIORITIES[self.priority]['name']}")
         print("\n📝 Instructions:")
         print("   1. Browser will open")
         print("   2. Do your test actions")
@@ -100,7 +162,10 @@ class SimpleRecorder:
         print("\nPress Enter to start...")
         input()
 
-        output_file = self.base_folder / "tests" / f"{self.test_name}.py"
+        # Output to test-specific folder
+        priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
+        test_folder = priority_folder / self.test_name
+        output_file = test_folder / "tests" / f"{self.test_name}_test.py"
 
         try:
             # Try to run playwright codegen
@@ -128,6 +193,30 @@ class SimpleRecorder:
             print("❌ Playwright not found!")
             print("💡 Install it: pip install playwright && playwright install")
             return None
+
+    def enhance_test(self, test_file):
+        """Enhance the recorded test with smart waits and fixes"""
+        print("\n🔧 Enhancing test with smart waits...")
+
+        try:
+            # Import the enhancer
+            from test_enhancer import TestEnhancer
+
+            # Get priority marker
+            marker = self.PRIORITIES[self.priority]['marker']
+
+            enhancer = TestEnhancer(test_file)
+            enhancer.enhance_in_place(marker=marker)
+
+            print("✅ Test enhanced with:")
+            print("   • Wait after login buttons")
+            print("   • URL validation instead of redundant page.goto()")
+            print("   • Element visibility waits")
+            print(f"   • Pytest marker: @pytest.mark.{marker}")
+
+        except Exception as e:
+            print(f"⚠️  Enhancement skipped: {e}")
+            print("   Test will still work, but may need manual tweaks")
 
     def create_test_runner(self, test_file):
         """Create simple test runner"""
