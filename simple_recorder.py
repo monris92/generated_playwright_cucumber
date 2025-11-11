@@ -210,9 +210,12 @@ class SimpleRecorder:
 
             print("✅ Test enhanced with:")
             print("   • Network idle waits after page.goto()")
-            print("   • Wait strategies before ALL button clicks")
-            print("   • Element visibility and ready checks")
-            print("   • Smart delays for animations/dynamic content")
+            print("   • Comprehensive button click strategies:")
+            print("     - Wait for network idle")
+            print("     - Verify attached, visible, and ENABLED")
+            print("     - Scroll into view if needed")
+            print("     - Click with 200ms delay")
+            print("   • Smart waits for animations/transitions")
             print("   • URL validation instead of redundant page.goto()")
             print(f"   • Pytest marker: @pytest.mark.{marker}")
 

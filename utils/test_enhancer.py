@@ -3,7 +3,14 @@
 Playwright Test Enhancer
 Automatically fixes common issues in recorded Playwright tests:
 - Adds network idle waits after page.goto()
-- Adds wait strategies before all button clicks
+- Adds comprehensive wait strategies before all button clicks:
+  * Wait for network idle
+  * Wait for element attached to DOM
+  * Wait for element visible
+  * Verify element is enabled (not disabled)
+  * Scroll into view if needed
+  * Wait for animations/transitions
+  * Add delay to click action
 - Adds waits after login buttons
 - Converts page.goto() after login to URL validation
 - Adds element visibility waits
@@ -106,17 +113,30 @@ class TestEnhancer:
                 continue
 
             # Add wait strategies before ANY button click
-            if self._is_button_click(line) and not self._already_has_wait_before(enhanced):
+            if self._is_button_click(line):
                 indent = self._get_indent(line)
                 button_locator = self._extract_button_locator(line)
 
-                if button_locator:
+                if button_locator and not self._already_has_wait_before(enhanced, button_locator):
                     print(f"  📍 Found button click at line {i+1}")
                     enhanced.append("")
-                    enhanced.append(f"{indent}# Wait for button to be ready")
+                    enhanced.append(f"{indent}# Wait for button to be fully ready and clickable")
                     enhanced.append(f"{indent}page.wait_for_load_state('networkidle', timeout=10000)")
+                    enhanced.append(f"{indent}{button_locator}.wait_for(state='attached', timeout=10000)")
                     enhanced.append(f"{indent}{button_locator}.wait_for(state='visible', timeout=10000)")
-                    enhanced.append(f"{indent}page.wait_for_timeout(300)  # Small delay for animations")
+                    enhanced.append(f"{indent}# Ensure button is enabled and not disabled")
+                    enhanced.append(f"{indent}expect({button_locator}).to_be_enabled()")
+                    enhanced.append(f"{indent}# Scroll into view if needed")
+                    enhanced.append(f"{indent}{button_locator}.scroll_into_view_if_needed()")
+                    enhanced.append(f"{indent}page.wait_for_timeout(500)  # Wait for any animations/transitions")
+
+            # Modify the click line to add delay
+            if self._is_button_click(line):
+                # Replace .click() with .click(delay=200)
+                modified_line = line.replace('.click()', '.click(delay=200)')
+                enhanced.append(modified_line)
+                i += 1
+                continue
 
             enhanced.append(line)
 
@@ -173,20 +193,26 @@ class TestEnhancer:
         return '.click()' in line and 'page.get_by_role("button"' in line
 
     def _extract_button_locator(self, line):
-        """Extract button locator from click line"""
+        """Extract button locator from click line (without .click())"""
         # Extract everything before .click()
-        match = re.search(r'(page\.get_by_role\("button"[^)]+\)(?:\.[^)]+\))*)', line)
+        # Match from page.get_by_role to just before .click()
+        match = re.search(r'(page\.get_by_role\("button"[^)]+\)(?:\.[^(]+\([^)]*\))*?)\.click\(', line)
         if match:
             return match.group(1)
         return None
 
-    def _already_has_wait_before(self, enhanced):
-        """Check if previous lines already have wait statements"""
-        # Check last 5 lines for wait statements
-        check_lines = enhanced[-5:] if len(enhanced) >= 5 else enhanced
-        for line in check_lines:
-            if 'wait_for' in line or 'page.wait_for_load_state' in line:
-                return True
+    def _already_has_wait_before(self, enhanced, button_locator=None):
+        """Check if previous lines already have wait statements for this specific button"""
+        # Check last 10 lines for button-specific wait statements
+        check_lines = enhanced[-10:] if len(enhanced) >= 10 else enhanced
+
+        # If we have a button locator, check for waits specific to this button
+        if button_locator:
+            # Look for waits that mention this specific button
+            for line in check_lines:
+                if button_locator in line and ('wait_for' in line or 'scroll_into_view' in line or 'to_be_enabled' in line):
+                    return True
+
         return False
 
     def _is_login_click(self, line):
@@ -251,9 +277,13 @@ def main():
     print("=" * 70)
     print("\nEnhancements applied:")
     print("  ✓ Network idle waits after page.goto()")
-    print("  ✓ Wait strategies before all button clicks")
+    print("  ✓ Comprehensive button click strategies:")
+    print("    - Wait for network idle")
+    print("    - Verify element attached, visible, and enabled")
+    print("    - Scroll into view if needed")
+    print("    - Add click delay (200ms)")
+    print("  ✓ Smart waits for animations and transitions")
     print("  ✓ Element visibility checks")
-    print("  ✓ Smart waits for animations and dynamic content")
     print()
 
     # Interactive mode if no arguments
