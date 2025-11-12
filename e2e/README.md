@@ -1,6 +1,6 @@
-# Interment Edit Second Test
+# Interment Add Test
 
-Recorded on: 2025-11-11 16:25
+Recorded on: 2025-11-12 11:46
 Website: https://map.chronicle.rip
 
 ## Run the test
@@ -17,7 +17,7 @@ python3 run_test.py
 
 ### Option 3: Direct pytest
 ```bash
-pytest tests/interment_edit_second.py -v
+pytest tests/interment_add.py -v
 ```
 
 ## View results
@@ -28,5 +28,5 @@ Open `reports/report.html` in your browser
 
 If you need to update the test:
 ```bash
-python3 -m playwright codegen https://map.chronicle.rip --target python-pytest --output tests/interment_edit_second.py
+python3 -m playwright codegen https://map.chronicle.rip --target python-pytest --output tests/interment_add.py
 ```

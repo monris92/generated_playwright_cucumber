@@ -128,7 +128,7 @@ class TestEnhancer:
                     enhanced.append(f"{indent}expect({button_locator}).to_be_enabled()")
                     enhanced.append(f"{indent}# Scroll into view if needed")
                     enhanced.append(f"{indent}{button_locator}.scroll_into_view_if_needed()")
-                    enhanced.append(f"{indent}page.wait_for_timeout(500)  # Wait for any animations/transitions")
+                    enhanced.append(f"{indent}page.wait_for_timeout(5000)  # Wait for any animations/transitions")
 
             # Modify the click line to add delay
             if self._is_button_click(line):
