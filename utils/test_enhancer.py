@@ -2,19 +2,19 @@
 """
 Playwright Test Enhancer
 Automatically fixes common issues in recorded Playwright tests:
-- Adds network idle waits after page.goto()
-- Adds comprehensive wait strategies before all button clicks:
-  * Wait for network idle
-  * Wait for element attached to DOM
+- Adds simple, reliable waits after page.goto()
+- Adds smart wait strategies before all button clicks:
   * Wait for element visible
   * Verify element is enabled (not disabled)
-  * Scroll into view if needed
-  * Wait for animations/transitions
-  * Add delay to click action
+  * Wait for animations/transitions (500ms)
+  * Add delay to click action (200ms)
 - Adds waits after login buttons
 - Converts page.goto() after login to URL validation
 - Adds element visibility waits
 - Fixes timing issues
+
+Note: Uses simple timeouts instead of networkidle for better reliability.
+networkidle often causes false failures on sites with polling/websockets.
 """
 
 import re
@@ -100,15 +100,15 @@ class TestEnhancer:
                 enhanced.append(f"@pytest.mark.{marker}")
                 marker_added = True
 
-            # Add wait after page.goto() for network idle
+            # Add wait after page.goto() - simple and reliable
             if self._is_goto_line(line):
                 enhanced.append(line)
                 indent = self._get_indent(line)
                 enhanced.append("")
-                enhanced.append(f"{indent}# Wait for page to fully load")
+                enhanced.append(f"{indent}# Wait for page to load")
                 enhanced.append(f"{indent}page.wait_for_load_state('load')")
-                enhanced.append(f"{indent}page.wait_for_load_state('networkidle')")
-                print(f"  📍 Added network idle wait after page.goto() at line {i+1}")
+                enhanced.append(f"{indent}page.wait_for_timeout(2000)  # Wait for dynamic content")
+                print(f"  📍 Added wait after page.goto() at line {i+1}")
                 i += 1
                 continue
 
@@ -120,11 +120,8 @@ class TestEnhancer:
                 if button_locator and not self._already_has_wait_before(enhanced, button_locator):
                     print(f"  📍 Found button click at line {i+1}")
                     enhanced.append("")
-                    enhanced.append(f"{indent}# Wait for button to be fully ready and clickable")
-                    enhanced.append(f"{indent}page.wait_for_load_state('networkidle', timeout=10000)")
-                    enhanced.append(f"{indent}{button_locator}.wait_for(state='attached', timeout=10000)")
+                    enhanced.append(f"{indent}# Wait for button to be ready and clickable")
                     enhanced.append(f"{indent}{button_locator}.wait_for(state='visible', timeout=10000)")
-                    enhanced.append(f"{indent}# Ensure button is enabled and not disabled")
                     enhanced.append(f"{indent}expect({button_locator}).to_be_enabled()")
                     enhanced.append(f"{indent}# Scroll into view if needed")
                     enhanced.append(f"{indent}{button_locator}.scroll_into_view_if_needed()")
@@ -148,8 +145,7 @@ class TestEnhancer:
                 enhanced.append("")
                 enhanced.append(f"{indent}# Wait for navigation after login")
                 enhanced.append(f"{indent}page.wait_for_load_state('load')")
-                enhanced.append(f"{indent}page.wait_for_load_state('networkidle')")
-                enhanced.append(f"{indent}page.wait_for_timeout(1000)  # Wait for dynamic content")
+                enhanced.append(f"{indent}page.wait_for_timeout(2000)  # Wait for dynamic content")
 
                 # Check if next non-empty line is page.goto()
                 next_line_idx = self._find_next_code_line(lines, i + 1)
@@ -164,8 +160,7 @@ class TestEnhancer:
                         url_path = self._extract_url_path(url)
                         enhanced.append(f'{indent}page.wait_for_url("**{url_path}", timeout=15000)')
                         enhanced.append(f"{indent}page.wait_for_load_state('load')")
-                        enhanced.append(f"{indent}page.wait_for_load_state('networkidle')")
-                        enhanced.append(f"{indent}page.wait_for_timeout(1000)")
+                        enhanced.append(f"{indent}page.wait_for_timeout(2000)")
                         enhanced.append("")
                         enhanced.append(f"{indent}# Validate we're on the correct page")
                         enhanced.append(f'{indent}expect(page).to_have_url("{url}")')
@@ -276,14 +271,16 @@ def main():
     print("🔧 Playwright Test Enhancer")
     print("=" * 70)
     print("\nEnhancements applied:")
-    print("  ✓ Network idle waits after page.goto()")
-    print("  ✓ Comprehensive button click strategies:")
-    print("    - Wait for network idle")
-    print("    - Verify element attached, visible, and enabled")
-    print("    - Scroll into view if needed")
-    print("    - Add click delay (200ms)")
-    print("  ✓ Smart waits for animations and transitions")
-    print("  ✓ Element visibility checks")
+    print("  ✓ Simple, reliable waits after page.goto() (load + 2s timeout)")
+    print("  ✓ Smart button click strategies:")
+    print("    - Wait for element visible")
+    print("    - Verify element is enabled (not disabled)")
+    print("    - Wait 500ms for animations/transitions")
+    print("    - Click with 200ms delay")
+    print("  ✓ Element visibility checks before assertions")
+    print()
+    print("Note: Using simple timeouts instead of networkidle for reliability.")
+    print("      networkidle can cause false failures with polling/websockets.")
     print()
 
     # Interactive mode if no arguments

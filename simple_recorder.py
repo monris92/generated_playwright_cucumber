@@ -209,15 +209,16 @@ class SimpleRecorder:
             enhancer.enhance_in_place(marker=marker)
 
             print("✅ Test enhanced with:")
-            print("   • Network idle waits after page.goto()")
-            print("   • Comprehensive button click strategies:")
-            print("     - Wait for network idle")
-            print("     - Verify attached, visible, and ENABLED")
-            print("     - Scroll into view if needed")
-            print("     - Click with 200ms delay")
-            print("   • Smart waits for animations/transitions")
+            print("   • Simple, reliable waits after page.goto()")
+            print("   • Smart button click strategies:")
+            print("     - Verify element visible and ENABLED")
+            print("     - Wait for animations (500ms)")
+            print("     - Click with delay (200ms)")
+            print("   • Element visibility checks before assertions")
             print("   • URL validation instead of redundant page.goto()")
             print(f"   • Pytest marker: @pytest.mark.{marker}")
+            print()
+            print("   ℹ️  Using simple timeouts (not networkidle) for reliability")
 
         except Exception as e:
             print(f"⚠️  Enhancement skipped: {e}")
