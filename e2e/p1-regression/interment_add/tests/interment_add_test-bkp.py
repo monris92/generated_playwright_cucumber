@@ -135,7 +135,7 @@ def test_example(page: Page) -> None:
     # Wait for element to be visible
     page.get_by_role("button", name="Add interment").wait_for(state='visible', timeout=10000)
     expect(page.get_by_role("button", name="Add interment")).to_be_visible()
-    page.get_by_role("button", name="Add interment").click(delay=200)
+    page.get_by_role("button", name="Add interment").click(delay=2000)
 
     # Wait for element to be visible
     page.get_by_role("heading", name="Add Interment").wait_for(state='visible', timeout=10000)
@@ -211,19 +211,19 @@ def test_example(page: Page) -> None:
     # Scroll into view if needed
     page.get_by_role("button", name="Delete").scroll_into_view_if_needed()
     page.wait_for_timeout(5000)  # Wait for any animations/transitions
-    page.get_by_role("button", name="Delete").click(delay=200)
+    page.get_by_role("button", name="Delete").click(delay=2000)
 
     # Wait for element to be visible
     page.get_by_role("heading", name="Delete Interment").wait_for(state='visible', timeout=10000)
     expect(page.get_by_role("heading", name="Delete Interment")).to_be_visible()
 
-    # Wait for button to be ready and clickable - using specific locator to avoid strict mode violation
-    page.get_by_test_id("customer-organization-astana-tegal-gundul-a20b2010-manage-edit-interment-ng-component-button-mat-focus-indicator").get_by_role("button", name="DELETE").wait_for(state='visible', timeout=10000)
-    expect(page.get_by_test_id("customer-organization-astana-tegal-gundul-a20b2010-manage-edit-interment-ng-component-button-mat-focus-indicator").get_by_role("button", name="DELETE")).to_be_enabled()
+    # Wait for button to be ready and clickable
+    page.get_by_role("button", name="DELETE").wait_for(state='visible', timeout=10000)
+    expect(page.get_by_role("button", name="DELETE")).to_be_enabled()
     # Scroll into view if needed
-    page.get_by_test_id("customer-organization-astana-tegal-gundul-a20b2010-manage-edit-interment-ng-component-button-mat-focus-indicator").get_by_role("button", name="DELETE").scroll_into_view_if_needed()
+    page.get_by_role("button", name="DELETE").scroll_into_view_if_needed()
     page.wait_for_timeout(5000)  # Wait for any animations/transitions
-    page.get_by_test_id("customer-organization-astana-tegal-gundul-a20b2010-manage-edit-interment-ng-component-button-mat-focus-indicator").get_by_role("button", name="DELETE").click(delay=200)
+    page.get_by_role("button", name="DELETE").click(delay=2000)
 
     # Wait for element to be visible
     page.get_by_role("heading", name="This plot is empty").wait_for(state='visible', timeout=10000)
