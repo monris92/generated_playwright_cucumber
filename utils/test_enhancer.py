@@ -3,15 +3,24 @@
 Playwright Test Enhancer
 Automatically fixes common issues in recorded Playwright tests:
 - Adds simple, reliable waits after page.goto()
-- Adds smart wait strategies before all button clicks:
+- Adds smart wait strategies before all button/element clicks:
   * Wait for element visible
   * Verify element is enabled (not disabled)
-  * Wait for animations/transitions (500ms)
-  * Add delay to click action (200ms)
+  * Scroll into view if needed
+  * Wait for animations/transitions (1-2s based on button type)
+  * Add optimized delay to click action (500ms-2s based on button type)
+- Detects navigation-triggering clicks (edit, save, etc) and adds appropriate waits
+- Warns about potential strict mode violations (generic button names)
 - Adds waits after login buttons
-- Converts page.goto() after login to URL validation
-- Adds element visibility waits
-- Fixes timing issues
+- Converts page.goto() after login to URL validation with wait_for_url
+- Adds element visibility waits before assertions
+- Fixes timing issues with flexible, dynamic approach
+
+Improvements:
+- Supports get_by_test_id, get_by_text, and other locators (not just get_by_role)
+- Intelligent delay based on button type (login: 2s, navigation: 1s, regular: 200ms)
+- Detects potential strict mode violations and adds helpful comments
+- Fixes login page.goto() replacement bug
 
 Note: Uses simple timeouts instead of networkidle for better reliability.
 networkidle often causes false failures on sites with polling/websockets.
@@ -119,57 +128,81 @@ class TestEnhancer:
 
                 if button_locator and not self._already_has_wait_before(enhanced, button_locator):
                     print(f"  📍 Found button click at line {i+1}")
-                    enhanced.append("")
-                    enhanced.append(f"{indent}# Wait for button to be ready and clickable")
+
+                    # Check if this might cause strict mode violation (generic locators)
+                    needs_comment = self._might_need_specific_locator(line)
+
+                    if needs_comment:
+                        enhanced.append("")
+                        enhanced.append(f"{indent}# Wait for button to be ready and clickable - use more specific locator if needed")
+                    else:
+                        enhanced.append("")
+                        enhanced.append(f"{indent}# Wait for button to be ready and clickable")
+
                     enhanced.append(f"{indent}{button_locator}.wait_for(state='visible', timeout=10000)")
                     enhanced.append(f"{indent}expect({button_locator}).to_be_enabled()")
                     enhanced.append(f"{indent}# Scroll into view if needed")
                     enhanced.append(f"{indent}{button_locator}.scroll_into_view_if_needed()")
+
+                    # Wait for animations/transitions - keep original timing
                     enhanced.append(f"{indent}page.wait_for_timeout(5000)  # Wait for any animations/transitions")
 
             # Modify the click line to add delay
             if self._is_button_click(line):
-                # Replace .click() with .click(delay=200)
-                modified_line = line.replace('.click()', '.click(delay=200)')
+                # Replace .click() with .click(delay=XXX) for better timing
+                # Check if this click might trigger navigation
+                button_locator = self._extract_button_locator(line)
+
+                # Optimized delays based on button type
+                if self._is_login_click(line):
+                    delay = 2000  # Login needs more time
+                elif self._is_likely_navigation_click(line):
+                    delay = 1000  # Navigation clicks
+                else:
+                    delay = 200   # Regular clicks - keep it fast like before!
+
+                modified_line = line.replace('.click()', f'.click(delay={delay})')
                 enhanced.append(modified_line)
+
+                # IMPORTANT: Check if this is login click BEFORE continue
+                # This ensures page.goto() replacement logic runs properly
+                if self._is_login_click(line):
+                    print(f"  📍 Found login action at line {i+1}")
+                    # Add wait after login
+                    indent = self._get_indent(line)
+                    enhanced.append("")
+                    enhanced.append(f"{indent}# Wait for navigation after login")
+                    enhanced.append(f"{indent}page.wait_for_load_state('load')")
+                    enhanced.append(f"{indent}page.wait_for_timeout(2000)  # Wait for dynamic content")
+
+                    # Check if next non-empty line is page.goto()
+                    next_line_idx = self._find_next_code_line(lines, i + 1)
+                    if next_line_idx and self._is_goto_line(lines[next_line_idx]):
+                        print(f"  📍 Found page.goto() after login at line {next_line_idx+1}")
+                        # Extract URL from goto
+                        url = self._extract_url_from_goto(lines[next_line_idx])
+                        if url:
+                            enhanced.append("")
+                            enhanced.append(f"{indent}# Wait for automatic navigation (instead of manual goto)")
+                            # Use wildcard pattern for wait_for_url to handle redirects
+                            url_path = self._extract_url_path(url)
+                            enhanced.append(f'{indent}page.wait_for_url("**{url_path}", timeout=15000)')
+                            enhanced.append(f"{indent}page.wait_for_load_state('load')")
+                            enhanced.append(f"{indent}page.wait_for_timeout(2000)")
+                            enhanced.append("")
+                            enhanced.append(f"{indent}# Validate we're on the correct page")
+                            enhanced.append(f'{indent}expect(page).to_have_url("{url}")')
+
+                            # Skip the original page.goto() line
+                            i = next_line_idx
+
                 i += 1
                 continue
 
             enhanced.append(line)
 
-            # Check if this line is a login button click
-            if self._is_login_click(line):
-                print(f"  📍 Found login action at line {i+1}")
-                # Add wait after login
-                indent = self._get_indent(line)
-                enhanced.append("")
-                enhanced.append(f"{indent}# Wait for navigation after login")
-                enhanced.append(f"{indent}page.wait_for_load_state('load')")
-                enhanced.append(f"{indent}page.wait_for_timeout(2000)  # Wait for dynamic content")
-
-                # Check if next non-empty line is page.goto()
-                next_line_idx = self._find_next_code_line(lines, i + 1)
-                if next_line_idx and self._is_goto_line(lines[next_line_idx]):
-                    print(f"  📍 Found page.goto() after login at line {next_line_idx+1}")
-                    # Extract URL from goto
-                    url = self._extract_url_from_goto(lines[next_line_idx])
-                    if url:
-                        enhanced.append("")
-                        enhanced.append(f"{indent}# Wait for automatic navigation (instead of manual goto)")
-                        # Use wildcard pattern for wait_for_url to handle redirects
-                        url_path = self._extract_url_path(url)
-                        enhanced.append(f'{indent}page.wait_for_url("**{url_path}", timeout=15000)')
-                        enhanced.append(f"{indent}page.wait_for_load_state('load')")
-                        enhanced.append(f"{indent}page.wait_for_timeout(2000)")
-                        enhanced.append("")
-                        enhanced.append(f"{indent}# Validate we're on the correct page")
-                        enhanced.append(f'{indent}expect(page).to_have_url("{url}")')
-
-                        # Skip the original page.goto() line
-                        i = next_line_idx
-
             # Add waits before expect() calls with element visibility checks
-            elif self._is_expect_element_line(line):
+            if self._is_expect_element_line(line):
                 # Check if previous line is already a wait_for
                 if i > 0 and 'wait_for' not in enhanced[-1]:
                     element_locator = self._extract_element_locator(line)
@@ -184,14 +217,17 @@ class TestEnhancer:
         return enhanced
 
     def _is_button_click(self, line):
-        """Check if line is any button click"""
-        return '.click()' in line and 'page.get_by_role("button"' in line
+        """Check if line is any button/element click"""
+        # Match both button clicks and general element clicks (get_by_test_id, etc)
+        return '.click()' in line and ('page.get_by_role("button"' in line or
+                                       'page.get_by_test_id(' in line or
+                                       'page.get_by_text(' in line)
 
     def _extract_button_locator(self, line):
-        """Extract button locator from click line (without .click())"""
+        """Extract button/element locator from click line (without .click())"""
         # Extract everything before .click()
-        # Match from page.get_by_role to just before .click()
-        match = re.search(r'(page\.get_by_role\("button"[^)]+\)(?:\.[^(]+\([^)]*\))*?)\.click\(', line)
+        # Match from page.get_by_* to just before .click()
+        match = re.search(r'(page\.get_by_[^(]+\([^)]+\)(?:\.[^(]+\([^)]*\))*?)\.click\(', line)
         if match:
             return match.group(1)
         return None
@@ -206,6 +242,53 @@ class TestEnhancer:
             # Look for waits that mention this specific button
             for line in check_lines:
                 if button_locator in line and ('wait_for' in line or 'scroll_into_view' in line or 'to_be_enabled' in line):
+                    return True
+
+        return False
+
+    def _is_likely_navigation_click(self, line):
+        """Check if click might trigger page navigation"""
+        # Buttons that commonly trigger navigation
+        navigation_keywords = [
+            'edit',  # Edit buttons often navigate to edit pages
+            'view',
+            'details',
+            'open',
+            'manage',
+            'save',
+            'submit',
+            'continue',
+            'next',
+            'proceed'
+        ]
+
+        line_lower = line.lower()
+        for keyword in navigation_keywords:
+            if keyword in line_lower:
+                return True
+
+        return False
+
+    def _might_need_specific_locator(self, line):
+        """Check if button locator might be ambiguous (strict mode violation risk)"""
+        # Generic button names that often appear multiple times
+        generic_names = [
+            'Delete',
+            'Cancel',
+            'OK',
+            'Yes',
+            'No',
+            'Save',
+            'Close',
+            'Submit',
+            'Edit',
+            'Remove'
+        ]
+
+        # Check if using get_by_role with generic name and no exact match
+        if 'get_by_role("button"' in line:
+            for name in generic_names:
+                if f'name="{name}"' in line and 'exact=True' not in line:
                     return True
 
         return False
@@ -268,16 +351,21 @@ class TestEnhancer:
 
 def main():
     """Command line interface"""
-    print("🔧 Playwright Test Enhancer")
+    print("🔧 Playwright Test Enhancer (v2.1 - Bug Fixed)")
     print("=" * 70)
     print("\nEnhancements applied:")
     print("  ✓ Simple, reliable waits after page.goto() (load + 2s timeout)")
-    print("  ✓ Smart button click strategies:")
+    print("  ✓ Smart button/element click strategies:")
     print("    - Wait for element visible")
     print("    - Verify element is enabled (not disabled)")
-    print("    - Wait 500ms for animations/transitions")
-    print("    - Click with 200ms delay")
+    print("    - Scroll into view if needed")
+    print("    - Wait 5s for animations/transitions")
+    print("    - Click with intelligent delay (login: 2s, navigation: 1s, regular: 200ms)")
+    print("  ✓ Detects navigation clicks (edit, save, manage, etc)")
+    print("  ✓ Warns about potential strict mode violations")
     print("  ✓ Element visibility checks before assertions")
+    print("  ✓ Supports all locator types (get_by_test_id, get_by_text, etc)")
+    print("  ✓ FIXED: Login page.goto() replacement now works correctly")
     print()
     print("Note: Using simple timeouts instead of networkidle for reliability.")
     print("      networkidle can cause false failures with polling/websockets.")

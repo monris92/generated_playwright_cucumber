@@ -42,6 +42,8 @@ class SimpleRecorder:
         self.test_name = None
         self.website_url = None
         self.priority = None
+        self.mode = None  # 'record' or 'generate'
+        self.existing_script = None  # Path to existing script if mode is 'generate'
 
     def run(self):
         """Main workflow"""
@@ -57,10 +59,15 @@ class SimpleRecorder:
         # Create structure
         self.create_structure()
 
-        # Record test
-        recorded_file = self.record_test()
-        if not recorded_file:
-            return False
+        # Record or use existing test
+        if self.mode == 'record':
+            recorded_file = self.record_test()
+            if not recorded_file:
+                return False
+        else:  # generate mode
+            recorded_file = self.generate_from_existing()
+            if not recorded_file:
+                return False
 
         # Enhance the test (add waits, fix common issues)
         self.enhance_test(recorded_file)
@@ -71,6 +78,66 @@ class SimpleRecorder:
         # Show instructions
         self.show_success()
         return True
+
+    def select_existing_script(self):
+        """Select existing script from codegen_script folder"""
+        codegen_folder = Path("codegen_script")
+
+        if not codegen_folder.exists():
+            print(f"\n❌ Folder 'codegen_script' not found!")
+            print("   This folder should contain your recorded Playwright scripts.")
+            return False
+
+        # Find all Python files in codegen_script
+        script_files = list(codegen_folder.glob("*.py"))
+
+        if not script_files:
+            print(f"\n❌ No Python scripts found in 'codegen_script' folder!")
+            print("   Please record a test first using mode 1 (Record new test)")
+            return False
+
+        print(f"\n📂 Available scripts in 'codegen_script':")
+        for idx, script in enumerate(script_files, 1):
+            print(f"   {idx}. {script.name}")
+
+        while True:
+            choice = input(f"\nSelect script [1-{len(script_files)}]: ").strip()
+
+            if choice.isdigit() and 1 <= int(choice) <= len(script_files):
+                self.existing_script = script_files[int(choice) - 1]
+                print(f"✅ Selected: {self.existing_script.name}")
+                return True
+            print(f"❌ Please enter a number between 1 and {len(script_files)}")
+
+    def generate_from_existing(self):
+        """Generate test structure from existing script"""
+        if not self.existing_script or not self.existing_script.exists():
+            print("❌ No existing script found!")
+            return None
+
+        print(f"\n📋 Generating test from: {self.existing_script.name}")
+
+        # Output to test-specific folder
+        priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
+        test_folder = priority_folder / self.test_name
+        output_file = test_folder / "tests" / f"{self.test_name}_test.py"
+
+        try:
+            # Read the existing script
+            script_content = self.existing_script.read_text()
+
+            # Write to the new location
+            output_file.write_text(script_content)
+
+            print(f"✅ Test generated: {output_file.name}")
+            print(f"   Source: {self.existing_script}")
+            print(f"   Destination: {output_file}")
+
+            return output_file
+
+        except Exception as e:
+            print(f"❌ Error generating test: {e}")
+            return None
 
     def get_inputs(self):
         """Get user inputs"""
@@ -105,6 +172,28 @@ class SimpleRecorder:
                 break
             print("❌ Please enter 1, 2, or 3")
 
+        # Ask mode: record new or generate from existing
+        print("\n🎯 Choose mode:")
+        print("   1. Record new test (open browser and record)")
+        print("   2. Generate from existing script (use script from codegen_script folder)")
+
+        while True:
+            mode_choice = input("Choose mode [1-2] (default: 1): ").strip()
+            if not mode_choice:
+                mode_choice = '1'
+
+            if mode_choice in ['1', '2']:
+                self.mode = 'record' if mode_choice == '1' else 'generate'
+                print(f"✅ Mode: {'Record new test' if self.mode == 'record' else 'Generate from existing script'}")
+                break
+            print("❌ Please enter 1 or 2")
+
+        # If generate mode, select existing script
+        if self.mode == 'generate':
+            if not self.select_existing_script():
+                print("❌ No script selected, switching to record mode")
+                self.mode = 'record'
+
         # Get test name
         while True:
             test_name = input("\n🏷️  Test name (e.g., login, search, checkout): ").strip().lower()
@@ -113,13 +202,17 @@ class SimpleRecorder:
                 break
             print("❌ Use only letters, numbers, hyphens, and underscores")
 
-        # Get URL
-        while True:
-            url = input("\n🌐 Website URL to test: ").strip()
-            if url.startswith(('http://', 'https://')):
-                self.website_url = url
-                break
-            print("❌ URL must start with http:// or https://")
+        # Get URL only if recording new test
+        if self.mode == 'record':
+            while True:
+                url = input("\n🌐 Website URL to test: ").strip()
+                if url.startswith(('http://', 'https://')):
+                    self.website_url = url
+                    break
+                print("❌ URL must start with http:// or https://")
+        else:
+            # For generate mode, we'll extract URL from script or use placeholder
+            self.website_url = "Generated from existing script"
 
     def create_structure(self):
         """Create folder structure with priority-based organization"""
@@ -162,10 +255,13 @@ class SimpleRecorder:
         print("\nPress Enter to start...")
         input()
 
-        # Output to test-specific folder
-        priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
-        test_folder = priority_folder / self.test_name
-        output_file = test_folder / "tests" / f"{self.test_name}_test.py"
+        # First record to codegen_script folder (original script)
+        codegen_folder = Path("codegen_script")
+        codegen_folder.mkdir(exist_ok=True)
+
+        # Generate timestamp for unique filename
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        codegen_file = codegen_folder / f"{self.test_name}_{timestamp}.py"
 
         try:
             # Try to run playwright codegen
@@ -173,14 +269,24 @@ class SimpleRecorder:
                 sys.executable, "-m", "playwright", "codegen",
                 self.website_url,
                 "--target", "python-pytest",
-                "--output", str(output_file)
+                "--output", str(codegen_file)
             ]
 
             print("🎥 Recording... (perform your test actions)")
             subprocess.run(cmd, check=True)
 
-            if output_file.exists():
-                print(f"✅ Test recorded: {output_file.name}")
+            if codegen_file.exists():
+                print(f"✅ Original script saved: {codegen_file}")
+
+                # Copy to test folder
+                priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
+                test_folder = priority_folder / self.test_name
+                output_file = test_folder / "tests" / f"{self.test_name}_test.py"
+
+                # Copy the content
+                output_file.write_text(codegen_file.read_text())
+                print(f"✅ Test copied to: {output_file.name}")
+
                 return output_file
             else:
                 print("❌ Recording failed - no file created")
