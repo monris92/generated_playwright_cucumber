@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test Runner for interment_add
+Test Runner for login
 """
 import subprocess
 import sys
@@ -8,13 +8,13 @@ from pathlib import Path
 
 def run_test():
     project_dir = Path(__file__).parent
-    test_file = project_dir / "tests" / "interment_add.py"
+    test_file = project_dir / "tests" / "login.py"
 
     if not test_file.exists():
         print(f"❌ Test file not found: {test_file}")
         return False
 
-    print(f"🚀 Running test: interment_add")
+    print(f"🚀 Running test: login")
     print(f"📁 Location: {test_file}")
     print()
 

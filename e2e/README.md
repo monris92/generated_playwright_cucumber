@@ -1,6 +1,6 @@
-# Interment Add Test
+# Login Test
 
-Recorded on: 2025-11-12 17:11
+Recorded on: 2025-11-13 10:37
 Website: Generated from existing script
 
 ## Run the test
@@ -17,7 +17,7 @@ python3 run_test.py
 
 ### Option 3: Direct pytest
 ```bash
-pytest tests/interment_add.py -v
+pytest tests/login.py -v
 ```
 
 ## View results
@@ -28,5 +28,5 @@ Open `reports/report.html` in your browser
 
 If you need to update the test:
 ```bash
-python3 -m playwright codegen Generated from existing script --target python-pytest --output tests/interment_add.py
+python3 -m playwright codegen Generated from existing script --target python-pytest --output tests/login.py
 ```
