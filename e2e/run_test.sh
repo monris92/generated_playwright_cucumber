@@ -3,5 +3,5 @@
 
 cd "$(dirname "$0")"
 
-echo "🚀 Running test: wl_advancesearch_deceased_in_cemetery"
+echo "🚀 Running test: l_advance_search_deceased"
 python3 run_test.py

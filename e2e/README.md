@@ -1,6 +1,6 @@
-# Wl Advancesearch Deceased In Cemetery Test
+# L Advance Search Deceased Test
 
-Recorded on: 2025-11-14 12:50
+Recorded on: 2025-11-14 16:04
 Website: https://map.chronicle.rip/
 
 ## Run the test
@@ -17,7 +17,7 @@ python3 run_test.py
 
 ### Option 3: Direct pytest
 ```bash
-pytest tests/wl_advancesearch_deceased_in_cemetery.py -v
+pytest tests/l_advance_search_deceased.py -v
 ```
 
 ## View results
@@ -28,5 +28,5 @@ Open `reports/report.html` in your browser
 
 If you need to update the test:
 ```bash
-python3 -m playwright codegen https://map.chronicle.rip/ --target python-pytest --output tests/wl_advancesearch_deceased_in_cemetery.py
+python3 -m playwright codegen https://map.chronicle.rip/ --target python-pytest --output tests/l_advance_search_deceased.py
 ```
