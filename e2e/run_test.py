@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test Runner for wl_advancesearch_byname_test
+Test Runner for wl_advancesearch_deceased_in_cemetery
 """
 import subprocess
 import sys
@@ -8,13 +8,13 @@ from pathlib import Path
 
 def run_test():
     project_dir = Path(__file__).parent
-    test_file = project_dir / "tests" / "wl_advancesearch_byname_test.py"
+    test_file = project_dir / "tests" / "wl_advancesearch_deceased_in_cemetery.py"
 
     if not test_file.exists():
         print(f"❌ Test file not found: {test_file}")
         return False
 
-    print(f"🚀 Running test: wl_advancesearch_byname_test")
+    print(f"🚀 Running test: wl_advancesearch_deceased_in_cemetery")
     print(f"📁 Location: {test_file}")
     print()
 
