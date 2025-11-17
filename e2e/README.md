@@ -1,6 +1,6 @@
-# L Advance Table Plot Delete Test
+# L Advance Table Interment Delete Test
 
-Recorded on: 2025-11-17 14:37
+Recorded on: 2025-11-17 16:06
 Website: https://map.chronicle.rip/
 
 ## Run the test
@@ -17,7 +17,7 @@ python3 run_test.py
 
 ### Option 3: Direct pytest
 ```bash
-pytest tests/l_advance_table_plot_delete.py -v
+pytest tests/l_advance_table_interment_delete.py -v
 ```
 
 ## View results
@@ -28,5 +28,5 @@ Open `reports/report.html` in your browser
 
 If you need to update the test:
 ```bash
-python3 -m playwright codegen https://map.chronicle.rip/ --target python-pytest --output tests/l_advance_table_plot_delete.py
+python3 -m playwright codegen https://map.chronicle.rip/ --target python-pytest --output tests/l_advance_table_interment_delete.py
 ```
