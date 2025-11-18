@@ -8,6 +8,23 @@ from pathlib import Path
 from datetime import datetime
 from playwright.sync_api import Page
 from pytest_html import extras
+import base64
+
+
+def pytest_addoption(parser):
+    """Add CLI and ini options for screenshot behavior"""
+    parser.addoption(
+        "--screenshot-on-success",
+        action="store_true",
+        dest="screenshot_on_success",
+        default=False,
+        help="Capture screenshot when a test succeeds",
+    )
+    parser.addini(
+        "screenshot_on_success",
+        "Capture screenshot when a test succeeds (true/false)",
+        default="false",
+    )
 
 
 # =============================================================================
@@ -42,20 +59,82 @@ def pytest_collection_modifyitems(config, items):
 
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Hook to capture test execution status and attach screenshots"""
+    """Hook to capture test execution status and attach screenshots."""
     outcome = yield
     rep = outcome.get_result()
 
-    # Store report in item for access in fixtures
+    # Keep report reference on the item for fixtures
     setattr(item, f"rep_{rep.when}", rep)
 
-    # Add screenshots to HTML report - must be done AFTER yield
-    if rep.when == "call":
-        # Get screenshots captured during test
-        screenshots = getattr(item, "_screenshots", [])
-        if screenshots:
-            # Attach screenshots to report extras
-            rep.extra = getattr(rep, "extra", []) + screenshots
+    # Only act on the call phase
+    if rep.when != "call":
+        return
+
+    extras_list = getattr(item, "_screenshots", []) or []
+
+    # Check config/CLI for screenshot-on-success
+    config = item.config
+    try:
+        enabled_cli = bool(config.getoption("screenshot_on_success"))
+    except Exception:
+        enabled_cli = False
+    ini_val = config.getini("screenshot_on_success")
+    enabled_ini = str(ini_val).lower() in ("1", "true", "yes")
+    should_capture_on_success = enabled_cli or enabled_ini
+
+    # Decide whether to capture now
+    want_capture = False
+    label = None
+    if rep.failed:
+        want_capture = True
+        label = "failed"
+    elif rep.passed and should_capture_on_success:
+        want_capture = True
+        label = "passed"
+
+    if want_capture:
+        page = item.funcargs.get("page") if "page" in item.funcargs else None
+        if page is not None:
+            test_name = item.name
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_name = f"{test_name}_{label}_{timestamp}.png"
+            screenshot_path = Path(__file__).parent / "reports" / "screenshots" / screenshot_name
+            screenshot_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                page.screenshot(path=str(screenshot_path), full_page=True)
+                print(f"📸 Screenshot saved: {screenshot_path}")
+
+                relative_path = f"screenshots/{screenshot_name}"
+                extras_list.append(extras.image(relative_path))
+
+                # Try embedding as base64 for reliability
+                try:
+                    with open(screenshot_path, "rb") as f:
+                        img_bytes = f.read()
+                    b64 = base64.b64encode(img_bytes).decode("ascii")
+                    data_uri = f"data:image/png;base64,{b64}"
+                    thumb_html = (
+                        f'<a href="{data_uri}" target="_blank">'
+                        f'<img src="{data_uri}" alt="{screenshot_name}" '
+                        f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
+                        f'</a>'
+                        f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
+                    )
+                    extras_list.append(extras.html(thumb_html))
+                except Exception:
+                    thumb_html = (
+                        f'<a href="{relative_path}" target="_blank">'
+                        f'<img src="{relative_path}" alt="{screenshot_name}" '
+                        f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
+                        f'</a>'
+                        f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
+                    )
+                    extras_list.append(extras.html(thumb_html))
+            except Exception as e:
+                print(f"❌ Failed to capture screenshot: {e}")
+
+    if extras_list:
+        rep.extra = getattr(rep, "extra", []) + extras_list
 
 
 # =============================================================================
@@ -86,23 +165,64 @@ def test_setup_teardown(request, page: Page):
 
     yield
 
-    # Teardown - capture screenshot on failure
-    if hasattr(request.node, 'rep_call') and request.node.rep_call.failed:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        screenshot_name = f"{test_name}_failed_{timestamp}.png"
-        screenshot_path = Path(__file__).parent / "reports" / "screenshots" / screenshot_name
+    # Teardown - capture screenshot on failure and optionally on success
+    # Ensure unified screenshots list exists
+    if not hasattr(request.node, "_screenshots"):
+        request.node._screenshots = []
 
+    def _capture_and_register(label: str):
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        screenshot_name = f"{test_name}_{label}_{timestamp}.png"
+        screenshot_path = Path(__file__).parent / "reports" / "screenshots" / screenshot_name
         try:
             page.screenshot(path=str(screenshot_path), full_page=True)
             print(f"📸 Screenshot saved: {screenshot_path}")
 
-            # Attach screenshot to HTML report
-            if not hasattr(request.node, "_screenshots_failure"):
-                request.node._screenshots_failure = []
             relative_path = f"screenshots/{screenshot_name}"
-            request.node._screenshots_failure.append(extras.image(relative_path))
+            request.node._screenshots.append(extras.image(relative_path))
+            # Also embed the image as a base64 data URI so the report always shows inline
+            try:
+                with open(screenshot_path, "rb") as f:
+                    img_bytes = f.read()
+                b64 = base64.b64encode(img_bytes).decode("ascii")
+                data_uri = f"data:image/png;base64,{b64}"
+
+                thumb_html = (
+                    f'<a href="{data_uri}" target="_blank">'
+                    f'<img src="{data_uri}" alt="{screenshot_name}" '
+                    f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
+                    f'</a>'
+                    f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
+                )
+                request.node._screenshots.append(extras.html(thumb_html))
+            except Exception as e:
+                # If embedding fails, fall back to path-based thumbnail
+                thumb_html = (
+                    f'<a href="{relative_path}" target="_blank">'
+                    f'<img src="{relative_path}" alt="{screenshot_name}" '
+                    f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
+                    f'</a>'
+                    f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
+                )
+                request.node._screenshots.append(extras.html(thumb_html))
         except Exception as e:
             print(f"❌ Failed to capture screenshot: {e}")
+        
+
+    # Always capture failure screenshots
+    if hasattr(request.node, 'rep_call') and request.node.rep_call.failed:
+        _capture_and_register("failed")
+
+    # Capture on success if enabled via CLI flag or pytest.ini
+    enabled_cli = False
+    try:
+        enabled_cli = bool(request.config.getoption("screenshot_on_success"))
+    except Exception:
+        enabled_cli = False
+    ini_val = request.config.getini("screenshot_on_success")
+    enabled_ini = str(ini_val).lower() in ("1", "true", "yes")
+    if hasattr(request.node, 'rep_call') and request.node.rep_call.passed and (enabled_cli or enabled_ini):
+        _capture_and_register("passed")
 
     print(f"\n{'='*70}")
     print(f"Finished test: {test_name}")
@@ -129,6 +249,15 @@ def screenshot(request, page: Page):
             # Store screenshot for later attachment to HTML report
             relative_path = f"screenshots/{screenshot_name}"
             request.node._screenshots.append(extras.image(relative_path))
+            # Add a clickable thumbnail that opens the full image in a new tab
+            thumb_html = (
+                f'<a href="{relative_path}" target="_blank">'
+                f'<img src="{relative_path}" alt="{screenshot_name}" '
+                f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
+                f'</a>'
+                f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
+            )
+            request.node._screenshots.append(extras.html(thumb_html))
 
             return screenshot_path
         except Exception as e:
