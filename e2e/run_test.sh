@@ -3,5 +3,5 @@
 
 cd "$(dirname "$0")"
 
-echo "🚀 Running test: login"
+echo "🚀 Running test: l_advance_table_interment_delete"
 python3 run_test.py

@@ -213,13 +213,25 @@ class InteractiveTestRunner:
 
     def _execute_pytest(self, test_path: str, description: str):
         """Execute pytest with given parameters"""
+        # Ask user whether to enable screenshot-on-success (default: N)
+        enable_success = False
+        try:
+            ans = input("Capture screenshots on success? (y/N): ").strip().lower()
+            if ans == 'y':
+                enable_success = True
+        except Exception:
+            enable_success = False
+
         cmd = [
             sys.executable, "-m", "pytest",
             test_path,
             "-v",
             "--html", str(self.base_folder / "reports" / "report.html"),
-            "--self-contained-html"
+            "--self-contained-html",
         ]
+
+        if enable_success:
+            cmd.append("--screenshot-on-success")
 
         # Ensure reports folder exists
         reports_folder = self.base_folder / "reports"
