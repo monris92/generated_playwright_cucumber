@@ -11,6 +11,35 @@ from pytest_html import extras
 import base64
 
 
+def get_thumb_html(src, alt):
+    """Generate HTML for thumbnail with modal support"""
+    # Inline JS to ensure execution (pytest-html might block script tags)
+    # Using DOM API instead of innerHTML to avoid nested quote issues
+    onclick_js = (
+        "if(!window.showModal){"
+        "var d=document,s=d.createElement('style');"
+        "s.innerHTML='.modal{display:none;position:fixed;z-index:9999;left:0;top:0;width:100%;height:100%;overflow:auto;background-color:rgba(0,0,0,0.9)}.modal-content{margin:auto;display:block;max-width:90%;max-height:90vh;position:relative;top:50%;transform:translateY(-50%)}.close{position:absolute;top:15px;right:35px;color:#f1f1f1;font-size:40px;font-weight:bold;cursor:pointer}';"
+        "d.head.appendChild(s);"
+        "var m=d.createElement('div');m.id='myModal';m.className='modal';"
+        "var c=d.createElement('span');c.className='close';c.innerHTML='&times;';c.onclick=function(){m.style.display='none'};m.appendChild(c);"
+        "var i=d.createElement('img');i.className='modal-content';i.id='img01';m.appendChild(i);"
+        "d.body.appendChild(m);"
+        "m.onclick=function(e){if(e.target!==i)m.style.display='none'};"
+        "window.showModal=function(s){m.style.display='block';i.src=s};"
+        "}"
+        "window.showModal(this.querySelector('img').src);"
+    )
+
+    return (
+        f"""<div onclick="{onclick_js}" style="cursor:pointer;display:inline-block;">"""
+        f"""<img src="{src}" alt="{alt}" class="thumb-img" """
+        f"""style="max-width:400px;border:1px solid #ddd;border-radius:4px;">"""
+        f"""</div>"""
+        f"""<div style="font-size:0.85em;color:#666;margin-top:4px;">{alt}</div>"""
+    )
+
+
+
 def pytest_addoption(parser):
     """Add CLI and ini options for screenshot behavior"""
     parser.addoption(
@@ -105,7 +134,7 @@ def pytest_runtest_makereport(item, call):
                 print(f"📸 Screenshot saved: {screenshot_path}")
 
                 relative_path = f"screenshots/{screenshot_name}"
-                extras_list.append(extras.image(relative_path))
+                # extras_list.append(extras.image(relative_path)) -- REMOVED to avoid duplication
 
                 # Try embedding as base64 for reliability
                 try:
@@ -113,22 +142,10 @@ def pytest_runtest_makereport(item, call):
                         img_bytes = f.read()
                     b64 = base64.b64encode(img_bytes).decode("ascii")
                     data_uri = f"data:image/png;base64,{b64}"
-                    thumb_html = (
-                        f'<a href="{data_uri}" target="_blank">'
-                        f'<img src="{data_uri}" alt="{screenshot_name}" '
-                        f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
-                        f'</a>'
-                        f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
-                    )
+                    thumb_html = get_thumb_html(data_uri, screenshot_name)
                     extras_list.append(extras.html(thumb_html))
                 except Exception:
-                    thumb_html = (
-                        f'<a href="{relative_path}" target="_blank">'
-                        f'<img src="{relative_path}" alt="{screenshot_name}" '
-                        f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
-                        f'</a>'
-                        f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
-                    )
+                    thumb_html = get_thumb_html(relative_path, screenshot_name)
                     extras_list.append(extras.html(thumb_html))
             except Exception as e:
                 print(f"❌ Failed to capture screenshot: {e}")
@@ -179,7 +196,7 @@ def test_setup_teardown(request, page: Page):
             print(f"📸 Screenshot saved: {screenshot_path}")
 
             relative_path = f"screenshots/{screenshot_name}"
-            request.node._screenshots.append(extras.image(relative_path))
+            # request.node._screenshots.append(extras.image(relative_path)) -- REMOVED to avoid duplication
             # Also embed the image as a base64 data URI so the report always shows inline
             try:
                 with open(screenshot_path, "rb") as f:
@@ -187,23 +204,11 @@ def test_setup_teardown(request, page: Page):
                 b64 = base64.b64encode(img_bytes).decode("ascii")
                 data_uri = f"data:image/png;base64,{b64}"
 
-                thumb_html = (
-                    f'<a href="{data_uri}" target="_blank">'
-                    f'<img src="{data_uri}" alt="{screenshot_name}" '
-                    f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
-                    f'</a>'
-                    f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
-                )
+                thumb_html = get_thumb_html(data_uri, screenshot_name)
                 request.node._screenshots.append(extras.html(thumb_html))
             except Exception as e:
                 # If embedding fails, fall back to path-based thumbnail
-                thumb_html = (
-                    f'<a href="{relative_path}" target="_blank">'
-                    f'<img src="{relative_path}" alt="{screenshot_name}" '
-                    f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
-                    f'</a>'
-                    f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
-                )
+                thumb_html = get_thumb_html(relative_path, screenshot_name)
                 request.node._screenshots.append(extras.html(thumb_html))
         except Exception as e:
             print(f"❌ Failed to capture screenshot: {e}")
@@ -248,15 +253,9 @@ def screenshot(request, page: Page):
 
             # Store screenshot for later attachment to HTML report
             relative_path = f"screenshots/{screenshot_name}"
-            request.node._screenshots.append(extras.image(relative_path))
-            # Add a clickable thumbnail that opens the full image in a new tab
-            thumb_html = (
-                f'<a href="{relative_path}" target="_blank">'
-                f'<img src="{relative_path}" alt="{screenshot_name}" '
-                f'style="max-width:400px;border:1px solid #ddd;border-radius:4px;">'
-                f'</a>'
-                f'<div style="font-size:0.85em;color:#666;margin-top:4px;">{screenshot_name}</div>'
-            )
+            # request.node._screenshots.append(extras.image(relative_path)) -- REMOVED to avoid duplication
+            # Add a clickable thumbnail that opens the modal
+            thumb_html = get_thumb_html(relative_path, screenshot_name)
             request.node._screenshots.append(extras.html(thumb_html))
 
             return screenshot_path
