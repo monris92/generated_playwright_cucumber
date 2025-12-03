@@ -1,7 +1,9 @@
 import re
 from playwright.sync_api import Page, expect
+import pytest
 
 
+@pytest.mark.smoke
 def test_example(page: Page) -> None:
     page.goto("https://map.chronicle.rip/")
 
