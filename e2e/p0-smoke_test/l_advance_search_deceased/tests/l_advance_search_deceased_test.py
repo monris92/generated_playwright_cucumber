@@ -4,7 +4,7 @@ import pytest
 
 
 @pytest.mark.smoke
-def test_example(page: Page) -> None:
+def test_example(page: Page, screenshot) -> None:
     page.goto("https://map.chronicle.rip/")
 
     # Wait for page to load
@@ -14,6 +14,7 @@ def test_example(page: Page) -> None:
     # Wait for element to be visible
     page.get_by_test_id("toolbar-a-1").wait_for(state='visible', timeout=10000)
     expect(page.get_by_test_id("toolbar-a-1")).to_be_visible()
+    screenshot("toolbar_visible")
 
     # Wait for element to be visible
     page.get_by_role("button", name="ADVANCED").wait_for(state='visible', timeout=10000)
@@ -27,6 +28,7 @@ def test_example(page: Page) -> None:
     # Wait for element to be visible
     page.get_by_test_id("login-login-screen-h2-sign-in-text").wait_for(state='visible', timeout=10000)
     expect(page.get_by_test_id("login-login-screen-h2-sign-in-text")).to_be_visible()
+    screenshot("login_screen_visible")
 
     # Wait for element to be visible
     page.get_by_test_id("login-login-screen-button-mat-focus-indicator").wait_for(state='visible', timeout=10000)
@@ -70,6 +72,7 @@ def test_example(page: Page) -> None:
 
     # Validate we're on the correct page
     expect(page).to_have_url("https://aus.chronicle.rip/customer-organization/Astana_Tegal_Gundul")
+    screenshot("dashboard_loaded")
 
     # Wait for element to be visible
     page.get_by_test_id("customer-organization-chronicle-admin-organization-toolbar-div-business-name-org").wait_for(state='visible', timeout=10000)
@@ -95,6 +98,7 @@ def test_example(page: Page) -> None:
     # Wait for element to be visible
     page.get_by_test_id("customer-organization-astana-tegal-gundul-advanced-search-form-div-title").wait_for(state='visible', timeout=10000)
     expect(page.get_by_test_id("customer-organization-astana-tegal-gundul-advanced-search-form-div-title")).to_be_visible()
+    screenshot("advanced_search_form_visible")
 
     # Wait for element to be visible
     page.get_by_role("button", name="Interment", exact=True).wait_for(state='visible', timeout=10000)
@@ -124,6 +128,7 @@ def test_example(page: Page) -> None:
     # Wait for element to be visible
     page.get_by_role("heading", name="plots found...").wait_for(state='visible', timeout=10000)
     expect(page.get_by_role("heading", name="plots found...")).to_be_visible()
+    screenshot("search_results_found")
 
     # Wait for element to be visible
     page.get_by_text("Budi Wijaya").wait_for(state='visible', timeout=10000)
@@ -141,6 +146,7 @@ def test_example(page: Page) -> None:
     # Wait for element to be visible
     page.get_by_text("B G 12 B. Wijaya").wait_for(state='visible', timeout=10000)
     expect(page.get_by_text("B G 12 B. Wijaya")).to_be_visible()
+    screenshot("plot_details_visible")
 
     # Wait for element to be visible
     page.get_by_test_id("customer-organization-astana-tegal-gundul-plots-b20g2012-plot-details-edit-div-cemetery-name-wrapper").get_by_text("Astana Tegal Gundul").wait_for(state='visible', timeout=10000)
