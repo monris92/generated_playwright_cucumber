@@ -175,7 +175,7 @@ def test_example(page: Page) -> None:
     expect(page.get_by_text("Data saved successfully")).to_be_visible()
 
     # Wait for element to be visible
-    page.get_by_test_id("customer-organization-advance-table-mat-sidenav-content-div-table-wrapper").locator("div").filter(has_text=re.compile(r"^2$").wait_for(state='visible', timeout=10000)
+    page.get_by_test_id("customer-organization-advance-table-mat-sidenav-content-div-table-wrapper").locator("div").filter(has_text=re.compile(r"^2$")).wait_for(state='visible', timeout=10000)
     expect(page.get_by_test_id("customer-organization-advance-table-mat-sidenav-content-div-table-wrapper").locator("div").filter(has_text=re.compile(r"^2$"))).to_be_visible()
 
     # Wait for element to be visible
