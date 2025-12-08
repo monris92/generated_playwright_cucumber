@@ -157,7 +157,12 @@ git checkout endri
 git pull origin endri
 
 # (Optional) Delete feature branch jika sudah tidak dipakai
+# Soft delete - hanya jika sudah merged
 git branch -d feature/old-feature
+git push origin --delete feature/old-feature
+
+# Force delete - jika branch tidak perlu di-merge
+git branch -D feature/old-feature
 git push origin --delete feature/old-feature
 ```
 
@@ -267,7 +272,8 @@ git branch -a                # Lihat semua branch (lokal + remote)
 ```bash
 git checkout endri           # Switch ke branch endri
 git checkout -b new-feature  # Create dan switch ke branch baru
-git branch -d old-feature    # Delete branch lokal
+git branch -d old-feature    # Delete branch lokal (jika sudah merged)
+git branch -D old-feature    # Force delete branch lokal (unmerged)
 git push origin --delete old # Delete branch remote
 ```
 
@@ -415,6 +421,24 @@ git reflog
 # Restore from reflog
 git checkout <commit-hash>
 git checkout -b recovery-branch
+```
+
+### Issue 6: Cannot Delete Branch (Not Fully Merged)
+```bash
+# Error message:
+# "error: the branch 'branch-name' is not fully merged"
+
+# Check if branch is really needed
+git log branch-name --oneline -5
+
+# If sure to delete (changes not needed)
+git branch -D branch-name              # Force delete local
+git push origin --delete branch-name   # Delete remote
+
+# Alternative: Merge first, then delete
+git checkout main
+git merge branch-name
+git branch -d branch-name  # Now safe to delete
 ```
 
 ---
