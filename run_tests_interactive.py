@@ -37,7 +37,7 @@ class InteractiveTestRunner:
             raise FileNotFoundError(f"E2E folder not found: {base_folder}")
 
     def run(self):
-        """Main interactive workflow"""
+        """Main interactive workflow supporting both category and flat test structures"""
         print("=" * 70)
         print("🧪 INTERACTIVE E2E TEST RUNNER")
         print("=" * 70)
@@ -50,21 +50,30 @@ class InteractiveTestRunner:
             self.run_all_tests()
             return
 
-        # Step 2: Get available scenarios for the priority
-        scenarios = self.get_scenarios(priority)
+        # Step 2: Get categories and flat tests for the priority
+        categories, flat_tests = self.get_categories_and_tests(priority)
 
-        if not scenarios:
+        if not categories and not flat_tests:
             print(f"\n⚠️  No test scenarios found for {priority.upper()}")
             print(f"   Create tests in: {self.base_folder / self.PRIORITIES[priority]['folder']}")
             return
 
-        # Step 3: Choose scenario or all scenarios in priority
-        scenario = self.choose_scenario(priority, scenarios)
+        # Step 3: Choose category, flat test, or all
+        selection = self.choose_category_or_test(priority, categories, flat_tests)
 
-        if scenario == 'all':
+        if selection['type'] == 'all':
             self.run_priority_tests(priority)
-        else:
-            self.run_specific_test(priority, scenario)
+        elif selection['type'] == 'category':
+            # Step 4: Choose specific test within category or all tests in category
+            category_name = selection['name']
+            test_choice = self.choose_test_in_category(priority, category_name)
+            
+            if test_choice == 'all':
+                self.run_category_tests(priority, category_name)
+            else:
+                self.run_specific_test(priority, test_choice, category_name)
+        else:  # flat test
+            self.run_specific_test(priority, selection['name'])
 
     def choose_priority(self) -> str:
         """Let user choose test priority"""
@@ -97,75 +106,190 @@ class InteractiveTestRunner:
 
             print("❌ Invalid choice. Please choose p0, p1, p2, or all")
 
-    def get_scenarios(self, priority: str) -> List[Dict]:
-        """Get list of test scenarios for a priority"""
+    def get_categories_and_tests(self, priority: str) -> tuple:
+        """
+        Get categories and flat tests separately.
+        
+        Returns:
+            tuple: (categories, flat_tests)
+            - categories: list of dicts with category info
+            - flat_tests: list of dicts with flat test info
+        """
         priority_folder = self.base_folder / self.PRIORITIES[priority]['folder']
-        scenarios = []
+        categories = []
+        flat_tests = []
 
         if not priority_folder.exists():
-            return scenarios
+            return categories, flat_tests
 
-        # Look for scenario folders (each scenario has its own folder)
-        for scenario_folder in sorted(priority_folder.iterdir()):
-            if not scenario_folder.is_dir():
+        for item in sorted(priority_folder.iterdir()):
+            if not item.is_dir() or item.name.startswith('.'):
                 continue
 
-            # Check if it has a tests folder with test files
-            tests_folder = scenario_folder / "tests"
-            if tests_folder.exists():
-                test_files = list(tests_folder.glob("*_test.py"))
+            # First check if it has subdirectories with tests (category structure)
+            has_test_subdirs = False
+            category_test_count = 0
+            for subitem in sorted(item.iterdir()):
+                if not subitem.is_dir() or subitem.name.startswith('.'):
+                    continue
+                sub_tests = subitem / "tests"
+                if sub_tests.exists() and list(sub_tests.glob("*_test.py")):
+                    has_test_subdirs = True
+                    category_test_count += len(list(sub_tests.glob("*_test.py")))
+
+            if has_test_subdirs:
+                # It's a category folder
+                categories.append({
+                    'name': item.name,
+                    'folder': item,
+                    'test_count': category_test_count
+                })
+            else:
+                # Check if it's a direct test folder (flat structure)
+                tests_folder = item / "tests"
+                if tests_folder.exists():
+                    test_files = list(tests_folder.glob("*_test.py"))
+                    if test_files:
+                        flat_tests.append({
+                            'name': item.name,
+                            'folder': item,
+                            'test_files': test_files,
+                            'test_count': len(test_files)
+                        })
+
+        return categories, flat_tests
+
+    def get_tests_in_category(self, priority: str, category_name: str) -> List[Dict]:
+        """Get all test folders within a category"""
+        priority_folder = self.base_folder / self.PRIORITIES[priority]['folder']
+        category_folder = priority_folder / category_name
+        tests = []
+
+        if not category_folder.exists():
+            return tests
+
+        for test_folder in sorted(category_folder.iterdir()):
+            if not test_folder.is_dir() or test_folder.name.startswith('.'):
+                continue
+
+            tests_dir = test_folder / "tests"
+            if tests_dir.exists():
+                test_files = list(tests_dir.glob("*_test.py"))
                 if test_files:
-                    scenarios.append({
-                        'name': scenario_folder.name,
-                        'folder': scenario_folder,
+                    tests.append({
+                        'name': test_folder.name,
+                        'folder': test_folder,
                         'test_files': test_files,
                         'test_count': len(test_files)
                     })
 
-        return scenarios
+        return tests
 
-    def choose_scenario(self, priority: str, scenarios: List[Dict]) -> str:
-        """Let user choose a specific scenario"""
-        print(f"\n📋 Available Scenarios in {priority.upper()}:")
+    def choose_category_or_test(self, priority: str, categories: List[Dict], flat_tests: List[Dict]) -> Dict:
+        """Let user choose a category, flat test, or all"""
+        print(f"\n📋 Available in {priority.upper()}:")
         print()
 
-        for idx, scenario in enumerate(scenarios, 1):
-            print(f"   {idx}. {scenario['name']}")
-            print(f"      Tests: {scenario['test_count']} file(s)")
-            for test_file in scenario['test_files']:
-                print(f"        • {test_file.name}")
+        options = []
+        idx = 1
+
+        # List categories first
+        if categories:
+            print("  📂 Categories:")
+            for category in categories:
+                print(f"   {idx}. {category['name']} ({category['test_count']} tests)")
+                options.append({
+                    'type': 'category',
+                    'name': category['name'],
+                    'data': category
+                })
+                idx += 1
             print()
 
-        print(f"   0. Run ALL scenarios in {priority.upper()}")
+        # Then list flat tests
+        if flat_tests:
+            print("  📝 Tests:")
+            for test in flat_tests:
+                print(f"   {idx}. {test['name']}")
+                options.append({
+                    'type': 'test',
+                    'name': test['name'],
+                    'data': test
+                })
+                idx += 1
+            print()
+
+        print(f"   0. Run ALL tests in {priority.upper()}")
         print()
 
         while True:
             try:
-                choice = input(f"Choose scenario [0-{len(scenarios)}] (default: 0): ").strip()
+                choice = input(f"Choose [0-{len(options)}] (default: 0): ").strip()
                 if not choice:
                     choice = '0'
 
                 choice_num = int(choice)
 
                 if choice_num == 0:
-                    print(f"✅ Selected: Run ALL scenarios in {priority.upper()}")
+                    print(f"✅ Selected: Run ALL in {priority.upper()}")
+                    return {'type': 'all'}
+                elif 1 <= choice_num <= len(options):
+                    selected = options[choice_num - 1]
+                    print(f"✅ Selected: {selected['name']}")
+                    return selected
+                else:
+                    print(f"❌ Invalid choice. Please choose 0-{len(options)}")
+            except ValueError:
+                print(f"❌ Invalid input. Please enter a number 0-{len(options)}")
+
+    def choose_test_in_category(self, priority: str, category_name: str) -> str:
+        """Let user choose a specific test within a category"""
+        tests = self.get_tests_in_category(priority, category_name)
+
+        print(f"\n📋 Tests in category '{category_name}':")
+        print()
+
+        for idx, test in enumerate(tests, 1):
+            print(f"   {idx}. {test['name']}")
+            print(f"      Tests: {test['test_count']} file(s)")
+            for test_file in test['test_files']:
+                print(f"        • {test_file.name}")
+            print()
+
+        print(f"   0. Run ALL tests in '{category_name}'")
+        print()
+
+        while True:
+            try:
+                choice = input(f"Choose [0-{len(tests)}] (default: 0): ").strip()
+                if not choice:
+                    choice = '0'
+
+                choice_num = int(choice)
+
+                if choice_num == 0:
+                    print(f"✅ Selected: Run ALL tests in '{category_name}'")
                     return 'all'
-                elif 1 <= choice_num <= len(scenarios):
-                    selected = scenarios[choice_num - 1]
+                elif 1 <= choice_num <= len(tests):
+                    selected = tests[choice_num - 1]
                     print(f"✅ Selected: {selected['name']}")
                     return selected['name']
                 else:
-                    print(f"❌ Invalid choice. Please choose 0-{len(scenarios)}")
+                    print(f"❌ Invalid choice. Please choose 0-{len(tests)}")
             except ValueError:
-                print(f"❌ Invalid input. Please enter a number 0-{len(scenarios)}")
+                print(f"❌ Invalid input. Please enter a number 0-{len(tests)}")
 
     def count_tests(self, priority_folder: Path) -> int:
-        """Count total test files in a priority folder"""
+        """Count total test files in a priority folder (supports both flat and nested)"""
         if not priority_folder.exists():
             return 0
 
-        test_files = list(priority_folder.glob("*/tests/*_test.py"))
-        return len(test_files)
+        # Count both flat structure (priority/test/tests/*.py) and 
+        # nested structure (priority/category/test/tests/*.py)
+        flat_tests = list(priority_folder.glob("*/tests/*_test.py"))
+        nested_tests = list(priority_folder.glob("*/*/tests/*_test.py"))
+        
+        return len(flat_tests) + len(nested_tests)
 
     def run_all_tests(self):
         """Run all tests across all priorities"""
@@ -194,21 +318,46 @@ class InteractiveTestRunner:
             description=f"{priority.upper()} Tests"
         )
 
-    def run_specific_test(self, priority: str, scenario_name: str):
-        """Run a specific test scenario"""
+    def run_category_tests(self, priority: str, category_name: str):
+        """Run all tests in a category"""
         priority_folder = self.base_folder / self.PRIORITIES[priority]['folder']
-        scenario_folder = priority_folder / scenario_name
-        tests_folder = scenario_folder / "tests"
+        category_folder = priority_folder / category_name
 
         print("\n" + "=" * 70)
-        print(f"🚀 Running Test: {scenario_name}")
+        print(f"🚀 Running Category: {category_name}")
+        print(f"📊 Priority: {self.PRIORITIES[priority]['name']}")
+        print("=" * 70)
+        print()
+
+        self._execute_pytest(
+            test_path=str(category_folder),
+            description=f"{priority.upper()}/{category_name}"
+        )
+
+    def run_specific_test(self, priority: str, test_name: str, category_name: Optional[str] = None):
+        """Run a specific test (with optional category)"""
+        priority_folder = self.base_folder / self.PRIORITIES[priority]['folder']
+        
+        if category_name:
+            test_folder = priority_folder / category_name / test_name
+            test_path_display = f"{priority.upper()}/{category_name}/{test_name}"
+        else:
+            test_folder = priority_folder / test_name
+            test_path_display = f"{priority.upper()}/{test_name}"
+        
+        tests_folder = test_folder / "tests"
+
+        print("\n" + "=" * 70)
+        print(f"🚀 Running Test: {test_name}")
+        if category_name:
+            print(f"📂 Category: {category_name}")
         print(f"📊 Priority: {self.PRIORITIES[priority]['name']}")
         print("=" * 70)
         print()
 
         self._execute_pytest(
             test_path=str(tests_folder),
-            description=f"{priority.upper()}/{scenario_name}"
+            description=test_path_display
         )
 
     def _execute_pytest(self, test_path: str, description: str):
