@@ -42,6 +42,7 @@ class SimpleRecorder:
         self.test_name = None
         self.website_url = None
         self.priority = None
+        self.category = None  # Category/folder for organizing tests
         self.mode = None  # 'record' or 'generate'
         self.existing_script = None  # Path to existing script if mode is 'generate'
 
@@ -117,9 +118,14 @@ class SimpleRecorder:
 
         print(f"\n📋 Generating test from: {self.existing_script.name}")
 
-        # Output to test-specific folder
+        # Output to test-specific folder (with or without category)
         priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
-        test_folder = priority_folder / self.test_name
+        
+        if self.category:
+            test_folder = priority_folder / self.category / self.test_name
+        else:
+            test_folder = priority_folder / self.test_name
+            
         output_file = test_folder / "tests" / f"{self.test_name}_test.py"
 
         try:
@@ -172,6 +178,9 @@ class SimpleRecorder:
                 break
             print("❌ Please enter 1, 2, or 3")
 
+        # Get category
+        self.get_category()
+
         # Ask mode: record new or generate from existing
         print("\n🎯 Choose mode:")
         print("   1. Record new test (open browser and record)")
@@ -214,33 +223,83 @@ class SimpleRecorder:
             # For generate mode, we'll extract URL from script or use placeholder
             self.website_url = "Generated from existing script"
 
+    def get_category(self):
+        """Get or create category for organizing tests"""
+        priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
+        
+        print(f"\n📂 Category/Feature (e.g., 'advance_search', 'interment', 'plot'):")
+        print("   This groups related tests together")
+        
+        # Show existing categories if any
+        if priority_folder.exists():
+            categories = [d for d in priority_folder.iterdir() 
+                         if d.is_dir() and not d.name.startswith('.')]
+            if categories:
+                print(f"\n   Existing categories in {self.priority.upper()}:")
+                for cat in sorted(categories):
+                    # Count tests in category
+                    test_count = len(list(cat.glob("*/tests/*_test.py")))
+                    print(f"   • {cat.name} ({test_count} tests)")
+                print()
+        
+        while True:
+            category = input("Enter category name (or press Enter to skip): ").strip().lower()
+            
+            # Allow empty for flat structure (no category)
+            if not category:
+                self.category = None
+                print("✅ No category - test will be in flat structure")
+                break
+            
+            # Validate category name
+            if category.replace('_', '').replace('-', '').isalnum():
+                self.category = category
+                
+                # Check if category exists
+                if priority_folder.exists():
+                    category_path = priority_folder / category
+                    if category_path.exists():
+                        print(f"✅ Using existing category: {category}")
+                    else:
+                        print(f"✅ Will create new category: {category}")
+                else:
+                    print(f"✅ Will create new category: {category}")
+                break
+            
+            print("❌ Use only letters, numbers, hyphens, and underscores")
+
     def create_structure(self):
-        """Create folder structure with priority-based organization"""
+        """Create folder structure with priority and optional category organization"""
         print(f"\n📂 Creating test structure...")
 
         # Get priority folder info
         priority_info = self.PRIORITIES[self.priority]
         priority_folder = self.base_folder / priority_info['folder']
 
-        # Create test-specific folder
-        test_folder = priority_folder / self.test_name
+        # Build path with or without category
+        if self.category:
+            test_folder = priority_folder / self.category / self.test_name
+            path_display = f"{priority_info['folder']}/{self.category}/{self.test_name}/"
+        else:
+            test_folder = priority_folder / self.test_name
+            path_display = f"{priority_info['folder']}/{self.test_name}/"
 
-        # Create folders
+        # Create folders (only tests/, no reports/)
         folders = [
             self.base_folder,
             priority_folder,
             test_folder,
-            test_folder / "tests",
-            test_folder / "reports"
+            test_folder / "tests"
         ]
+
+        # Add category folder if needed
+        if self.category:
+            folders.insert(2, priority_folder / self.category)
 
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
 
-        # Note: We don't create __init__.py to avoid import conflicts with pytest
-        # pytest will discover tests without __init__.py files
-
-        print(f"✅ Folders created in {priority_info['folder']}/{self.test_name}/")
+        print(f"✅ Folders created in {path_display}")
 
     def record_test(self):
         """Record the test"""
@@ -278,10 +337,19 @@ class SimpleRecorder:
             if codegen_file.exists():
                 print(f"✅ Original script saved: {codegen_file}")
 
-                # Copy to test folder
+                # Copy to test folder (with or without category)
                 priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
-                test_folder = priority_folder / self.test_name
+                
+                if self.category:
+                    test_folder = priority_folder / self.category / self.test_name
+                else:
+                    test_folder = priority_folder / self.test_name
+                    
                 output_file = test_folder / "tests" / f"{self.test_name}_test.py"
+
+                # Ensure tests directory exists
+                tests_dir = test_folder / "tests"
+                tests_dir.mkdir(parents=True, exist_ok=True)
 
                 # Copy the content
                 output_file.write_text(codegen_file.read_text())
@@ -331,137 +399,35 @@ class SimpleRecorder:
             print("   Test will still work, but may need manual tweaks")
 
     def create_test_runner(self, test_file):
-        """Create simple test runner"""
-        print("\n🔧 Setting up test runner...")
-
-        # Create pytest.ini
-        pytest_config = f"""[pytest]
-testpaths = tests
-python_files = *.py
-python_functions = test_*
-addopts =
-    -v
-    --html=reports/report.html
-    --self-contained-html
-"""
-
-        pytest_file = self.base_folder / "pytest.ini"
-        pytest_file.write_text(pytest_config)
-
-        # Create run script
-        run_script = f"""#!/usr/bin/env python3
-\"\"\"
-Test Runner for {self.test_name}
-\"\"\"
-import subprocess
-import sys
-from pathlib import Path
-
-def run_test():
-    project_dir = Path(__file__).parent
-    test_file = project_dir / "tests" / "{self.test_name}.py"
-
-    if not test_file.exists():
-        print(f"❌ Test file not found: {{test_file}}")
-        return False
-
-    print(f"🚀 Running test: {self.test_name}")
-    print(f"📁 Location: {{test_file}}")
-    print()
-
-    cmd = [
-        sys.executable, "-m", "pytest",
-        str(test_file),
-        "-v",
-        "--html", "reports/report.html",
-        "--self-contained-html"
-    ]
-
-    result = subprocess.run(cmd, cwd=project_dir)
-
-    if result.returncode == 0:
-        print("\\n✅ Test PASSED!")
-    else:
-        print("\\n❌ Test FAILED!")
-
-    print(f"📊 Report: {{project_dir / 'reports' / 'report.html'}}")
-    return result.returncode == 0
-
-if __name__ == "__main__":
-    success = run_test()
-    sys.exit(0 if success else 1)
-"""
-
-        run_file = self.base_folder / "run_test.py"
-        run_file.write_text(run_script)
-        run_file.chmod(0o755)
-
-        # Create shell runner
-        shell_script = f"""#!/bin/bash
-# Simple test runner
-
-cd "$(dirname "$0")"
-
-echo "🚀 Running test: {self.test_name}"
-python3 run_test.py
-"""
-
-        shell_file = self.base_folder / "run_test.sh"
-        shell_file.write_text(shell_script)
-        shell_file.chmod(0o755)
-
-        # Create README
-        readme = f"""# {self.test_name.replace('_', ' ').title()} Test
-
-Recorded on: {datetime.now().strftime('%Y-%m-%d %H:%M')}
-Website: {self.website_url}
-
-## Run the test
-
-### Option 1: Python
-```bash
-python3 run_test.py
-```
-
-### Option 2: Shell script
-```bash
-./run_test.sh
-```
-
-### Option 3: Direct pytest
-```bash
-pytest tests/{self.test_name}.py -v
-```
-
-## View results
-
-Open `reports/report.html` in your browser
-
-## Re-record
-
-If you need to update the test:
-```bash
-python3 -m playwright codegen {self.website_url} --target python-pytest --output tests/{self.test_name}.py
-```
-"""
-
-        readme_file = self.base_folder / "README.md"
-        readme_file.write_text(readme)
-
-        print("✅ Test runner created")
+        """Point user to the main interactive test runner"""
+        print("\n✅ Test runner: Use run_tests_interactive.py")
+        print(f"   Located at: {Path.cwd() / 'run_tests_interactive.py'}")
 
     def show_success(self):
         """Show success message"""
         print("\n" + "=" * 70)
         print("🎉 SUCCESS! Your test is ready!")
         print("=" * 70)
-        print(f"\n📁 Location: {self.base_folder}")
+        
+        # Build path display
+        priority_info = self.PRIORITIES[self.priority]
+        if self.category:
+            test_path = f"{priority_info['folder']}/{self.category}/{self.test_name}"
+        else:
+            test_path = f"{priority_info['folder']}/{self.test_name}"
+        
+        print(f"\n📁 Location: {self.base_folder}/{test_path}")
         print(f"🏷️  Test: {self.test_name}")
+        if self.category:
+            print(f"📂 Category: {self.category}")
+        print(f"📊 Priority: {self.priority.upper()} - {priority_info['name']}")
         print(f"🌐 URL: {self.website_url}")
         print("\n📋 How to run your test:")
-        print(f"   cd {self.base_folder}")
-        print(f"   python3 run_test.py")
-        print("\n📊 Results will be in: reports/report.html")
+        print("   python3 run_tests_interactive.py")
+        print(f"   Then select: {self.priority.upper()}", end="")
+        if self.category:
+            print(f" → {self.category}", end="")
+        print(f" → {self.test_name}")
         print("\n✨ That's it! Simple and working!")
 
 
