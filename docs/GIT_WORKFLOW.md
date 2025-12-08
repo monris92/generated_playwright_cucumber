@@ -47,6 +47,22 @@ git fetch origin main
 git merge origin/main
 ```
 
+**Output yang diharapkan:**
+```bash
+# Jika up-to-date:
+# Already up to date.
+✅ SELESAI! Branch sudah terbaru, mulai coding.
+
+# Jika ada update:
+# Updating abc1234..def5678
+# Fast-forward
+#  file.py | 10 ++++++++--
+✅ SELESAI! Branch sudah updated, mulai coding.
+```
+
+**Apa selanjutnya?**
+→ Lanjut ke **Step 2** untuk mulai coding
+
 ### 2. Selama Kerja
 
 ```bash
@@ -66,16 +82,55 @@ git commit -m "fix: resolve syntax error in test file"
 git commit -m "docs: update README with new instructions"
 ```
 
+**Output setelah commit:**
+```bash
+# [endri abc1234] feat: add category feature
+#  2 files changed, 45 insertions(+), 10 deletions(-)
+✅ SELESAI! Changes sudah di-commit.
+```
+
+**Apa selanjutnya?**
+- 💾 **Push ke remote** → Lanjut ke **Step 3** (backup ke GitHub)
+- 💻 **Lanjut coding** → Ulangi step 2 (edit → commit)
+- 📋 **Cek perubahan** → `git log --oneline -5`
+
 ### 3. Push ke Remote (Backup & Share)
 
 ```bash
 # Push perubahan ke remote branch
 git push origin endri
+```
 
-# Jika ada error "rejected", pull dulu
+**Jika berhasil:**
+```bash
+# Output seperti ini:
+# Enumerating objects: 5, done.
+# Counting objects: 100% (5/5), done.
+# ...
+# To https://github.com/...
+#    abc1234..def5678  endri -> endri
+
+✅ SELESAI! Perubahan sudah di backup ke remote.
+```
+
+**Jika ada error "rejected":**
+```bash
+# Error message:
+# ! [rejected]        endri -> endri (non-fast-forward)
+# error: failed to push some refs
+
+# Artinya: Ada commit baru di remote yang belum kamu punya
+# Solution: Pull dulu, lalu push lagi
 git pull origin endri --rebase
 git push origin endri
+
+✅ SELESAI! Conflict resolved dan sudah di-push.
 ```
+
+**Apa selanjutnya?**
+- ✅ Jika hanya backup → Selesai, lanjut kerja
+- 🔀 Jika mau merge ke main → Lanjut ke section [Merge ke Main](#merge-ke-main)
+- 💻 Jika mau lanjut coding → Back to step 2 (edit → commit → push)
 
 ---
 
@@ -99,6 +154,8 @@ git commit -m "Your changes description"
 git push origin endri
 ```
 
+✅ **SELESAI Step 1** → Lanjut ke **Step 2**
+
 #### Step 2: Sync dengan Main (Hindari Conflict)
 ```bash
 # Fetch latest main
@@ -106,13 +163,30 @@ git fetch origin main
 
 # Merge main ke branch kerja
 git merge origin/main
-
-# Jika ada conflict, resolve dulu (lihat section Resolve Conflicts)
-# Setelah resolve:
-git add .
-git commit -m "Merge main into endri"
-git push origin endri
 ```
+
+**Jika tidak ada conflict:**
+```bash
+# Already up to date.
+# atau
+# Fast-forward
+✅ SELESAI Step 2! Lanjut ke **Step 3**
+```
+
+**Jika ada conflict:**
+```bash
+# CONFLICT (content): Merge conflict in file.py
+# Automatic merge failed; fix conflicts and then commit
+⚠️ Ada conflict! Resolve dulu:
+```
+1. Lihat panduan di section [Resolve Conflicts](#resolve-conflicts)
+2. Setelah resolve:
+   ```bash
+   git add .
+   git commit -m "Merge main into endri"
+   git push origin endri
+   ```
+3. ✅ **SELESAI Step 2** → Lanjut ke **Step 3**
 
 #### Step 3: Create Pull Request
 1. Buka **GitHub** → Repository
@@ -127,6 +201,11 @@ git push origin endri
    - **Title**: Ringkasan perubahan
    - **Description**: Detail perubahan, testing yang sudah dilakukan
 8. Klik **"Create pull request"**
+
+✅ **SELESAI Step 3!** PR sudah dibuat.
+
+**Apa selanjutnya?**
+→ Lanjut ke **Step 4** untuk review & merge
 
 #### Step 4: Review & Merge
 1. Review code (atau minta tim review)
@@ -146,6 +225,11 @@ git push origin endri
      - **Rebase and merge** (linear history)
    - Klik **"Confirm merge"**
 
+✅ **SELESAI Step 4!** PR sudah di-merge ke main.
+
+**Apa selanjutnya?**
+→ Lanjut ke **Step 5** untuk cleanup
+
 #### Step 5: Cleanup
 ```bash
 # Update local main
@@ -157,9 +241,21 @@ git checkout endri
 git pull origin endri
 
 # (Optional) Delete feature branch jika sudah tidak dipakai
+# Soft delete - hanya jika sudah merged
 git branch -d feature/old-feature
 git push origin --delete feature/old-feature
+
+# Force delete - jika branch tidak perlu di-merge
+git branch -D feature/old-feature
+git push origin --delete feature/old-feature
 ```
+
+✅ **SELESAI SEMUA!** Merge ke main sudah selesai.
+
+**Apa selanjutnya?**
+- 💻 **Lanjut coding** → Back to [Daily Workflow](#daily-workflow) step 1
+- 🎉 **Selesai untuk hari ini** → Good job!
+- 📊 **Cek hasil di main** → `git log main --oneline -5`
 
 ---
 
@@ -175,13 +271,19 @@ git pull origin main
 # Merge branch kerja ke main
 git merge endri
 
-# Jika ada conflict, resolve dulu
+# Jika ada conflict, resolve dulu (lihat section Resolve Conflicts)
 # Setelah clean:
 git push origin main
 
 # Back to branch kerja
 git checkout endri
 ```
+
+✅ **SELESAI!** Changes sudah di-merge ke main.
+
+**Apa selanjutnya?**
+- 💻 **Lanjut coding** → `git checkout endri` dan back to [Daily Workflow](#daily-workflow)
+- 🎉 **Selesai untuk hari ini** → Good job!
 
 ---
 
@@ -236,6 +338,12 @@ git status
    git push origin endri
    ```
 
+✅ **SELESAI!** Conflict resolved.
+
+**Apa selanjutnya?**
+- 🔀 Jika dalam proses merge ke main → Lanjut ke step berikutnya di [Merge ke Main](#merge-ke-main)
+- 💻 Jika lanjut coding → Back to [Daily Workflow](#daily-workflow) step 2
+
 ### Tools untuk Resolve Conflict:
 ```bash
 # Using VS Code
@@ -267,7 +375,8 @@ git branch -a                # Lihat semua branch (lokal + remote)
 ```bash
 git checkout endri           # Switch ke branch endri
 git checkout -b new-feature  # Create dan switch ke branch baru
-git branch -d old-feature    # Delete branch lokal
+git branch -d old-feature    # Delete branch lokal (jika sudah merged)
+git branch -D old-feature    # Force delete branch lokal (unmerged)
 git push origin --delete old # Delete branch remote
 ```
 
@@ -415,6 +524,24 @@ git reflog
 # Restore from reflog
 git checkout <commit-hash>
 git checkout -b recovery-branch
+```
+
+### Issue 6: Cannot Delete Branch (Not Fully Merged)
+```bash
+# Error message:
+# "error: the branch 'branch-name' is not fully merged"
+
+# Check if branch is really needed
+git log branch-name --oneline -5
+
+# If sure to delete (changes not needed)
+git branch -D branch-name              # Force delete local
+git push origin --delete branch-name   # Delete remote
+
+# Alternative: Merge first, then delete
+git checkout main
+git merge branch-name
+git branch -d branch-name  # Now safe to delete
 ```
 
 ---
