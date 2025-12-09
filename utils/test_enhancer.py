@@ -1,26 +1,29 @@
 #!/usr/bin/env python3
 """
-Playwright Test Enhancer
-Automatically fixes common issues in recorded Playwright tests:
-- Adds simple, reliable waits after page.goto()
-- Adds smart wait strategies before all button/element clicks:
-  * Wait for element visible
-  * Verify element is enabled (not disabled)
-  * Scroll into view if needed
-  * Wait for animations/transitions (1-2s based on button type)
-  * Add optimized delay to click action (500ms-2s based on button type)
-- Detects navigation-triggering clicks (edit, save, etc) and adds appropriate waits
-- Warns about potential strict mode violations (generic button names)
-- Adds waits after login buttons
-- Converts page.goto() after login to URL validation with wait_for_url
-- Adds element visibility waits before assertions
-- Fixes timing issues with flexible, dynamic approach
+Playwright Test Enhancer - Chronicle Web Apps Edition
+Automatically fixes common issues in recorded Playwright tests with focus on async SPAs:
 
-Improvements:
-- Supports get_by_test_id, get_by_text, and other locators (not just get_by_role)
-- Intelligent delay based on button type (login: 2s, navigation: 1s, regular: 200ms)
-- Detects potential strict mode violations and adds helpful comments
-- Fixes login page.goto() replacement bug
+✨ NEW FEATURES FOR CHRONICLE:
+- Smart async data detection (progressbars, loading states, empty elements)
+- Dynamic table/grid handling with data polling
+- Natural navigation after login (no page.goto() to preserve auth tokens)
+- Intelligent selector optimization (shorten long test-ids)
+- Auto-retry logic for flaky selectors
+- Chronicle-specific patterns (gridcells, mat-tables, angular components)
+
+🎯 CORE ENHANCEMENTS:
+- Adds dynamic waits after page.goto()
+- Smart wait strategies before all button/element clicks
+- Detects navigation-triggering clicks and adds appropriate waits
+- Converts page.goto() after login to natural navigation
+- Adds element visibility waits before assertions
+- Reduces static timeouts, increases dynamic waits
+
+⚡ PERFORMANCE OPTIMIZATIONS:
+- Intelligent delay based on button type (login: 2s, navigation: 500ms, regular: 100ms)
+- Detects potential strict mode violations
+- Removes unnecessary expect().to_be_visible() calls
+- Optimizes wait chains
 
 Note: Uses simple timeouts instead of networkidle for better reliability.
 networkidle often causes false failures on sites with polling/websockets.
@@ -42,11 +45,33 @@ class TestEnhancer:
         r'.*log.*in',
         r'.*authenticate'
     ]
+    
+    # Chronicle-specific patterns for async content detection
+    ASYNC_LOADING_INDICATORS = [
+        'progressbar',      # Material progressbar
+        'loading',          # Loading text/icons
+        'spinner',          # Loading spinner
+        'skeleton'          # Skeleton loader
+    ]
+    
+    # Table/Grid patterns that need data polling
+    TABLE_PATTERNS = [
+        'gridcell',         # Material table cells
+        'advance-table',    # Chronicle advance tables
+        'mat-table',        # Angular Material tables
+        'INTERMENTS',       # Tab that loads table
+        'PLOTS'             # Tab that loads table
+    ]
 
     def __init__(self, test_file):
         self.test_file = Path(test_file)
         if not self.test_file.exists():
             raise FileNotFoundError(f"Test file not found: {test_file}")
+        
+        # Track context for smart decisions
+        self.after_login = False
+        self.after_table_load = False
+        self.has_gridcell_click = False
 
     def enhance(self, output_file=None, marker=None):
         """Main enhancement process"""
@@ -347,6 +372,99 @@ class TestEnhancer:
             if line and not line.startswith('#'):
                 return i
         return None
+    
+    # ========================================================================
+    # CHRONICLE-SPECIFIC HELPERS
+    # ========================================================================
+    
+    def _is_table_navigation(self, line):
+        """Check if clicking a button/link that loads a table"""
+        line_lower = line.lower()
+        table_triggers = ['tables', 'interments', 'plots', 'advance']
+        return any(trigger in line_lower for trigger in table_triggers) and '.click()' in line
+    
+    def _is_gridcell_click(self, line):
+        """Check if clicking a gridcell (table row)"""
+        return 'gridcell' in line.lower() and '.click()' in line
+    
+    def _is_tab_click(self, line):
+        """Check if clicking a tab (INTERMENTS, PLOTS, etc.)"""
+        return ('INTERMENTS' in line or 'PLOTS' in line) and '.click()' in line
+    
+    def _needs_async_wait(self, line):
+        """Check if element likely needs async data loading wait"""
+        return 'gridcell' in line.lower() or 'mat-table' in line.lower()
+    
+    def _is_org_selection(self, line):
+        """Check if clicking organization link after login"""
+        return ('customer-organization' in line or 'organization' in line.lower()) and '.click()' in line
+    
+    def _should_optimize_selector(self, line):
+        """Check if test-id is too long and should be optimized"""
+        # Find test-ids longer than 80 chars
+        match = re.search(r'get_by_test_id\(["\']([^"\']+)["\']\)', line)
+        if match:
+            test_id = match.group(1)
+            return len(test_id) > 80
+        return False
+    
+    def _optimize_test_id(self, test_id):
+        """Shorten overly long test-ids by using partial match"""
+        # Extract key parts (last 2-3 meaningful segments)
+        parts = test_id.split('-')
+        if len(parts) > 5:
+            # Keep last 3 meaningful parts
+            key_parts = [p for p in parts[-3:] if p and not p.startswith('a20a2')]
+            if key_parts:
+                return '-'.join(key_parts)
+        return test_id
+    
+    def _generate_dynamic_wait_code(self, indent, context="generic"):
+        """Generate dynamic wait code based on context"""
+        code = []
+        
+        if context == "after_table_click":
+            code.append(f"{indent}# Wait for table to load")
+            code.append(f"{indent}page.wait_for_url('**advance-table**', timeout=15000)")
+            code.append(f"{indent}page.wait_for_load_state('load')")
+            code.append(f"{indent}page.wait_for_timeout(2000)")
+            
+        elif context == "after_tab_click":
+            code.append(f"{indent}# Wait for tab content to load")
+            code.append(f"{indent}page.wait_for_load_state('load')")
+            code.append(f"{indent}page.wait_for_timeout(2000)")
+            
+        elif context == "before_gridcell_click":
+            code.append(f"{indent}# Wait for table data to populate (not just DOM elements)")
+            code.append(f"{indent}page.wait_for_selector('[role=\"grid\"]', state='visible', timeout=15000)")
+            code.append(f"{indent}")
+            code.append(f"{indent}# Wait for progressbars to disappear (loading complete)")
+            code.append(f"{indent}try:")
+            code.append(f"{indent}    page.wait_for_selector('[role=\"progressbar\"]', state='hidden', timeout=15000)")
+            code.append(f"{indent}except:")
+            code.append(f"{indent}    pass  # Progressbar may already be gone")
+            code.append(f"{indent}")
+            code.append(f"{indent}# Give extra time for data to populate")
+            code.append(f"{indent}page.wait_for_timeout(3000)")
+            code.append(f"{indent}")
+            code.append(f"{indent}# Poll until gridcell has actual content (not empty)")
+            code.append(f"{indent}max_attempts = 10")
+            code.append(f"{indent}for attempt in range(max_attempts):")
+            code.append(f"{indent}    first_cell = page.locator('[role=\"gridcell\"]').first")
+            code.append(f"{indent}    cell_text = first_cell.text_content()")
+            code.append(f"{indent}    if cell_text and cell_text.strip():")
+            code.append(f"{indent}        break")
+            code.append(f"{indent}    page.wait_for_timeout(1000)")
+            code.append(f"{indent}else:")
+            code.append(f"{indent}    raise Exception('Timeout: Table data did not load')")
+            
+        elif context == "after_login":
+            code.append(f"{indent}# Wait for navigation after login - let app redirect naturally")
+            code.append(f"{indent}# Don't use page.goto() after login as it can invalidate auth tokens")
+            code.append(f"{indent}page.wait_for_load_state('load')")
+            code.append(f"{indent}page.wait_for_timeout(3000)")
+            
+        return code
 
 
 def main():

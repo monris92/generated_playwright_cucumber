@@ -369,30 +369,31 @@ class SimpleRecorder:
             return None
 
     def enhance_test(self, test_file):
-        """Enhance the recorded test with smart waits and fixes"""
-        print("\n🔧 Enhancing test with smart waits...")
+        """Enhance the recorded test with Chronicle-specific improvements"""
+        print("\n🔧 Enhancing test with Chronicle patterns...")
 
         try:
-            # Import the enhancer
-            from utils.test_enhancer import TestEnhancer
+            # Import the Chronicle enhancer
+            from utils.chronicle_enhancer import ChronicleEnhancer
 
             # Get priority marker
             marker = self.PRIORITIES[self.priority]['marker']
 
-            enhancer = TestEnhancer(test_file)
-            enhancer.enhance_in_place(marker=marker)
+            enhancer = ChronicleEnhancer(test_file)
+            enhancer.enhance(marker=marker)
 
             print("✅ Test enhanced with:")
-            print("   • Simple, reliable waits after page.goto()")
-            print("   • Smart button click strategies:")
-            print("     - Verify element visible and ENABLED")
-            print("     - Wait for animations (500ms)")
-            print("     - Click with delay (200ms)")
-            print("   • Element visibility checks before assertions")
-            print("   • URL validation instead of redundant page.goto()")
+            print("   • Dynamic async waits (no static timeouts)")
+            print("   • Table data polling (wait for actual content)")
+            print("   • Natural navigation after login (preserve auth tokens)")
+            print("   • Optimized selectors (shorter, more flexible)")
             print(f"   • Pytest marker: @pytest.mark.{marker}")
             print()
-            print("   ℹ️  Using simple timeouts (not networkidle) for reliability")
+            print(f"📊 Enhancement Statistics:")
+            print(f"   • Dynamic waits added: {enhancer.stats['dynamic_waits_added']}")
+            print(f"   • Table polling added: {enhancer.stats['table_polls_added']}")
+            print(f"   • Login flows fixed: {enhancer.stats['login_flows_fixed']}")
+            print(f"   • Selectors optimized: {enhancer.stats['selectors_optimized']}")
 
         except Exception as e:
             print(f"⚠️  Enhancement skipped: {e}")

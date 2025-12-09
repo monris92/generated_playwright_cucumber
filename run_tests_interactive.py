@@ -362,6 +362,25 @@ class InteractiveTestRunner:
 
     def _execute_pytest(self, test_path: str, description: str):
         """Execute pytest with given parameters"""
+        # Ask user for browser display mode
+        print("\n🖥️  Browser Display Mode:")
+        print("   1. 🚀 Headless - Terminal only (faster, no browser window)")
+        print("   2. 👁️  Headed - Show live browser (watch test execution)")
+        print()
+        
+        headless = True
+        try:
+            mode_choice = input("Choose mode [1/2] (default: 1): ").strip()
+            if mode_choice == '2':
+                headless = False
+                print("✅ Headed mode: Browser will be visible during test")
+            else:
+                print("✅ Headless mode: Running in terminal only")
+        except Exception:
+            headless = True
+        
+        print()
+        
         # Ask user whether to enable screenshot-on-success (default: N)
         enable_success = False
         try:
@@ -378,6 +397,12 @@ class InteractiveTestRunner:
             "--html", str(self.base_folder / "reports" / "report.html"),
             "--self-contained-html",
         ]
+
+        # Add headless/headed flag
+        # pytest-playwright uses --headed flag (no value needed for headed mode)
+        # Default is headless, so only add flag if user wants headed
+        if not headless:
+            cmd.append("--headed")
 
         if enable_success:
             cmd.append("--screenshot-on-success")
