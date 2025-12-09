@@ -91,8 +91,7 @@ def test_example(page: Page) -> None:
     page.get_by_test_id("customer-organization-advance-table-manage-add-person-mat-form-field-input-email").fill("faris@chronicle.rip")
     page.get_by_test_id("customer-organization-advance-table-manage-add-person-mat-form-field-input-add-notes").click()
     page.get_by_test_id("customer-organization-advance-table-manage-add-person-mat-form-field-input-add-notes").fill("notes baru")
-    with page.wait_api_response("/adv_table/persons/?"):
+    with page.wait_api_response("api/v1/adv_table/interments/"):
         page.get_by_role("button", name="save").click()
-    page.wait_for_timeout(2000)
     expect(page.get_by_role("gridcell", name="ahmadXxX")).to_be_visible()
     expect(page.get_by_role("grid")).to_contain_text("faris")
