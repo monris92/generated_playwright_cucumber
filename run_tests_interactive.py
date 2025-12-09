@@ -132,11 +132,20 @@ class InteractiveTestRunner:
             for subitem in sorted(item.iterdir()):
                 if not subitem.is_dir() or subitem.name.startswith('.'):
                     continue
-                # Check for test files directly in subitem (flat structure)
-                sub_test_files = list(subitem.glob("*_test.py"))
-                if sub_test_files:
-                    has_test_subdirs = True
-                    category_test_count += len(sub_test_files)
+                # Check for test files in tests/ subfolder
+                if (subitem / "tests").exists():
+                    sub_test_files = list((subitem / "tests").glob("*_test.py"))
+                    if sub_test_files:
+                        has_test_subdirs = True
+                        category_test_count += len(sub_test_files)
+                # Also check for subcategory structure (public/login)
+                for sub_subitem in subitem.iterdir():
+                    if sub_subitem.is_dir() and not sub_subitem.name.startswith('.'):
+                        if (sub_subitem / "tests").exists():
+                            subsub_test_files = list((sub_subitem / "tests").glob("*_test.py"))
+                            if subsub_test_files:
+                                has_test_subdirs = True
+                                category_test_count += len(subsub_test_files)
 
             if has_test_subdirs:
                 # It's a category folder
@@ -146,8 +155,8 @@ class InteractiveTestRunner:
                     'test_count': category_test_count
                 })
             else:
-                # Check if it's a direct test folder (flat structure)
-                test_files = list(item.glob("*_test.py"))
+                # Check if it's a direct test folder with tests/ subfolder
+                test_files = list((item / "tests").glob("*_test.py")) if (item / "tests").exists() else []
                 if test_files:
                     flat_tests.append({
                         'name': item.name,
@@ -159,7 +168,7 @@ class InteractiveTestRunner:
         return categories, flat_tests
 
     def get_tests_in_category(self, priority: str, category_name: str) -> List[Dict]:
-        """Get all test folders within a category"""
+        """Get all test folders within a category (supports subcategories like public/login)"""
         priority_folder = self.base_folder / self.PRIORITIES[priority]['folder']
         category_folder = priority_folder / category_name
         tests = []
@@ -167,19 +176,40 @@ class InteractiveTestRunner:
         if not category_folder.exists():
             return tests
 
-        for test_folder in sorted(category_folder.iterdir()):
-            if not test_folder.is_dir() or test_folder.name.startswith('.'):
+        for item in sorted(category_folder.iterdir()):
+            if not item.is_dir() or item.name.startswith('.'):
                 continue
 
-            # Look for test files directly in test_folder (flat structure)
-            test_files = list(test_folder.glob("*_test.py"))
-            if test_files:
-                tests.append({
-                    'name': test_folder.name,
-                    'folder': test_folder,
-                    'test_files': test_files,
-                    'test_count': len(test_files)
-                })
+            # Check if this is a subcategory (e.g., public, login)
+            # Subcategories contain test folders, not test files directly
+            has_subdirs = any(sub.is_dir() and not sub.name.startswith('.') for sub in item.iterdir())
+            
+            if has_subdirs:
+                # This is a subcategory, scan its contents
+                for test_folder in sorted(item.iterdir()):
+                    if not test_folder.is_dir() or test_folder.name.startswith('.'):
+                        continue
+                    
+                    # Look for test files in tests/ subfolder
+                    test_files = list((test_folder / "tests").glob("*_test.py")) if (test_folder / "tests").exists() else []
+                    if test_files:
+                        tests.append({
+                            'name': f"{item.name}/{test_folder.name}",
+                            'folder': test_folder,
+                            'test_files': test_files,
+                            'test_count': len(test_files)
+                        })
+            else:
+                # Direct test folder (no subcategory)
+                # Look for test files in tests/ subfolder
+                test_files = list((item / "tests").glob("*_test.py")) if (item / "tests").exists() else []
+                if test_files:
+                    tests.append({
+                        'name': item.name,
+                        'folder': item,
+                        'test_files': test_files,
+                        'test_count': len(test_files)
+                    })
 
         return tests
 
@@ -278,16 +308,19 @@ class InteractiveTestRunner:
                 print(f"❌ Invalid input. Please enter a number 0-{len(tests)}")
 
     def count_tests(self, priority_folder: Path) -> int:
-        """Count total test files in a priority folder (supports both flat and nested)"""
+        """Count total test files in a priority folder (supports subcategory and tests/ subfolder)"""
         if not priority_folder.exists():
             return 0
 
-        # Count both flat structure (priority/test/*.py) and 
-        # nested structure (priority/category/test/*.py)
-        flat_tests = list(priority_folder.glob("*/*_test.py"))
-        nested_tests = list(priority_folder.glob("*/*/*_test.py"))
+        # Count with tests/ subfolder:
+        # priority/test/tests/*.py
+        # priority/category/test/tests/*.py
+        # priority/category/subcategory/test/tests/*.py
+        direct_tests = list(priority_folder.glob("*/tests/*_test.py"))
+        category_tests = list(priority_folder.glob("*/*/tests/*_test.py"))
+        subcategory_tests = list(priority_folder.glob("*/*/*/tests/*_test.py"))
         
-        return len(flat_tests) + len(nested_tests)
+        return len(direct_tests) + len(category_tests) + len(subcategory_tests)
 
     def run_all_tests(self):
         """Run all tests across all priorities"""

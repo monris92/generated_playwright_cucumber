@@ -43,6 +43,7 @@ class SimpleRecorder:
         self.website_url = None
         self.priority = None
         self.category = None  # Category/folder for organizing tests
+        self.subcategory = None  # Sub-category (e.g. public, login)
         self.mode = None  # 'record' or 'generate'
         self.existing_script = None  # Path to existing script if mode is 'generate'
 
@@ -122,20 +123,22 @@ class SimpleRecorder:
 
         print(f"\n📋 Generating test from: {self.existing_script.name}")
 
-        # Output to test-specific folder (with or without category)
+        # Output to test-specific folder (with or without category/subcategory)
         priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
         
-        # Use original script name to preserve specificity
-        original_name = self.existing_script.stem  # Remove .py extension
-        test_filename = f"{original_name}_test.py"
+        # Use test_name for the test file
+        test_filename = f"{self.test_name}_test.py"
         
         if self.category:
-            test_folder = priority_folder / self.category / self.test_name
+            if self.subcategory:
+                test_folder = priority_folder / self.category / self.subcategory / self.test_name
+            else:
+                test_folder = priority_folder / self.category / self.test_name
         else:
             test_folder = priority_folder / self.test_name
             
-        # Put test file directly in test_folder (no redundant 'tests/' subfolder)
-        output_file = test_folder / test_filename
+        # Put test file in tests/ subfolder
+        output_file = test_folder / "tests" / test_filename
 
         try:
             # Read the existing script
@@ -290,6 +293,22 @@ class SimpleRecorder:
                         print(f"✅ Will create new category: {category}")
                 else:
                     print(f"✅ Will create new category: {category}")
+                
+                # Ask for subcategory
+                print(f"\n📂 Sub-category (e.g., 'public', 'login'):")
+                print("   Optional: Press Enter to skip")
+                
+                subcategory = input("Enter sub-category name: ").strip().lower()
+                if subcategory:
+                    if subcategory.replace('_', '').replace('-', '').isalnum():
+                        self.subcategory = subcategory
+                        print(f"✅ Sub-category: {subcategory}")
+                    else:
+                        print("⚠️  Invalid subcategory name, skipping")
+                        self.subcategory = None
+                else:
+                    self.subcategory = None
+                
                 break
             
             print("❌ Use only letters, numbers, hyphens, and underscores")
@@ -302,24 +321,31 @@ class SimpleRecorder:
         priority_info = self.PRIORITIES[self.priority]
         priority_folder = self.base_folder / priority_info['folder']
 
-        # Build path with or without category
+        # Build path with category and optional subcategory
         if self.category:
-            test_folder = priority_folder / self.category / self.test_name
-            path_display = f"{priority_info['folder']}/{self.category}/{self.test_name}/"
+            if self.subcategory:
+                test_folder = priority_folder / self.category / self.subcategory / self.test_name
+                path_display = f"{priority_info['folder']}/{self.category}/{self.subcategory}/{self.test_name}"
+            else:
+                test_folder = priority_folder / self.category / self.test_name
+                path_display = f"{priority_info['folder']}/{self.category}/{self.test_name}"
         else:
             test_folder = priority_folder / self.test_name
-            path_display = f"{priority_info['folder']}/{self.test_name}/"
+            path_display = f"{priority_info['folder']}/{self.test_name}"
 
-        # Create folders (flat structure - no tests/ subfolder)
+        # Create folders (with tests/ subfolder for better organization)
+        test_folder = test_folder / "tests"
         folders = [
             self.base_folder,
             priority_folder,
             test_folder
         ]
 
-        # Add category folder if needed
+        # Add category and subcategory folders if needed
         if self.category:
             folders.insert(2, priority_folder / self.category)
+            if self.subcategory:
+                folders.insert(3, priority_folder / self.category / self.subcategory)
 
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
@@ -362,21 +388,24 @@ class SimpleRecorder:
             if codegen_file.exists():
                 print(f"✅ Original script saved: {codegen_file}")
 
-                # Copy to test folder (with or without category)
+                # Copy to test folder (with or without category/subcategory)
                 priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
                 
                 if self.category:
-                    test_folder = priority_folder / self.category / self.test_name
+                    if self.subcategory:
+                        test_folder = priority_folder / self.category / self.subcategory / self.test_name
+                    else:
+                        test_folder = priority_folder / self.category / self.test_name
                 else:
                     test_folder = priority_folder / self.test_name
                 
-                # Use timestamped filename to match codegen script naming
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                test_filename = f"{self.test_name}_{timestamp}_test.py"
-                output_file = test_folder / test_filename
+                # Use simple test filename (no timestamp in final test file)
+                test_filename = f"{self.test_name}_test.py"
+                output_file = test_folder / "tests" / test_filename
 
                 # Ensure test folder exists
                 test_folder.mkdir(parents=True, exist_ok=True)
+                (test_folder / "tests").mkdir(exist_ok=True)
 
                 # Copy the content
                 output_file.write_text(codegen_file.read_text())
@@ -440,7 +469,10 @@ class SimpleRecorder:
         # Build path display
         priority_info = self.PRIORITIES[self.priority]
         if self.category:
-            test_path = f"{priority_info['folder']}/{self.category}/{self.test_name}"
+            if self.subcategory:
+                test_path = f"{priority_info['folder']}/{self.category}/{self.subcategory}/{self.test_name}"
+            else:
+                test_path = f"{priority_info['folder']}/{self.category}/{self.test_name}"
         else:
             test_path = f"{priority_info['folder']}/{self.test_name}"
         
@@ -448,6 +480,8 @@ class SimpleRecorder:
         print(f"🏷️  Test: {self.test_name}")
         if self.category:
             print(f"📂 Category: {self.category}")
+        if self.subcategory:
+            print(f"📂 Sub-category: {self.subcategory}")
         print(f"📊 Priority: {self.priority.upper()} - {priority_info['name']}")
         print(f"🌐 URL: {self.website_url}")
         print("\n📋 How to run your test:")
@@ -455,6 +489,8 @@ class SimpleRecorder:
         print(f"   Then select: {self.priority.upper()}", end="")
         if self.category:
             print(f" → {self.category}", end="")
+            if self.subcategory:
+                print(f" → {self.subcategory}", end="")
         print(f" → {self.test_name}")
 
     def bulk_generate_from_all(self):
@@ -473,7 +509,15 @@ class SimpleRecorder:
             return False
         
         print(f"\n📦 Found {len(script_files)} scripts to process")
-        print(f"📁 Target folder: {self.base_folder / self.priority / self.category}")
+        priority_info = self.PRIORITIES[self.priority]
+        if self.category:
+            if self.subcategory:
+                target_path = f"{priority_info['folder']}/{self.category}/{self.subcategory}"
+            else:
+                target_path = f"{priority_info['folder']}/{self.category}"
+        else:
+            target_path = priority_info['folder']
+        print(f"📁 Target folder: {self.base_folder / target_path}")
         print("\n📄 Files:")
         for idx, script_file in enumerate(script_files, 1):
             print(f"   {idx:2d}. {script_file.name}")
