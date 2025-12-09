@@ -57,6 +57,10 @@ class SimpleRecorder:
         # Get inputs
         self.get_inputs()
 
+        # If bulk generate mode, process all scripts
+        if self.mode == 'bulk_generate':
+            return self.bulk_generate_from_all()
+
         # Create structure
         self.create_structure()
 
@@ -183,24 +187,41 @@ class SimpleRecorder:
                 break
             print("❌ Please enter 1, 2, or 3")
 
-        # Get category
+        # Get category/folder first (after priority)
         self.get_category()
 
         # Ask mode: record new or generate from existing
         print("\n🎯 Choose mode:")
         print("   1. Record new test (open browser and record)")
-        print("   2. Generate from existing script (use script from codegen_script folder)")
+        print("   2. Generate from existing script (single file)")
+        print("   3. Bulk generate from ALL scripts in codegen_script folder")
 
         while True:
-            mode_choice = input("Choose mode [1-2] (default: 1): ").strip()
+            mode_choice = input("Choose mode [1-3] (default: 1): ").strip()
             if not mode_choice:
                 mode_choice = '1'
 
-            if mode_choice in ['1', '2']:
-                self.mode = 'record' if mode_choice == '1' else 'generate'
-                print(f"✅ Mode: {'Record new test' if self.mode == 'record' else 'Generate from existing script'}")
+            if mode_choice in ['1', '2', '3']:
+                if mode_choice == '1':
+                    self.mode = 'record'
+                elif mode_choice == '2':
+                    self.mode = 'generate'
+                else:
+                    self.mode = 'bulk_generate'
+                
+                mode_text = {
+                    'record': 'Record new test',
+                    'generate': 'Generate from existing script',
+                    'bulk_generate': 'Bulk generate from ALL scripts'
+                }
+                print(f"✅ Mode: {mode_text[self.mode]}")
                 break
-            print("❌ Please enter 1 or 2")
+            print("❌ Please enter 1, 2, or 3")
+
+        # If bulk generate mode, skip test name input
+        if self.mode == 'bulk_generate':
+            self.test_name = None  # Will be extracted from filenames
+            return  # Skip to bulk generation
 
         # If generate mode, select existing script
         if self.mode == 'generate':
@@ -435,6 +456,139 @@ class SimpleRecorder:
         if self.category:
             print(f" → {self.category}", end="")
         print(f" → {self.test_name}")
+
+    def bulk_generate_from_all(self):
+        """Bulk generate tests from all scripts in codegen_script folder"""
+        codegen_folder = Path("codegen_script")
+        
+        if not codegen_folder.exists():
+            print(f"\n❌ Folder 'codegen_script' not found!")
+            return False
+        
+        # Find all Python files and sort alphabetically
+        script_files = sorted(list(codegen_folder.glob("*.py")), key=lambda x: x.name.lower())
+        
+        if not script_files:
+            print(f"\n❌ No Python scripts found in 'codegen_script' folder!")
+            return False
+        
+        print(f"\n📦 Found {len(script_files)} scripts to process")
+        print(f"📁 Target folder: {self.base_folder / self.priority / self.category}")
+        print("\n📄 Files:")
+        for idx, script_file in enumerate(script_files, 1):
+            print(f"   {idx:2d}. {script_file.name}")
+        
+        # Ask for range selection
+        print(f"\n🎯 Select range to process (1-{len(script_files)})")
+        print("   Examples: '1-5' or '10-15' or 'all' for all files")
+        range_input = input("Enter range: ").strip().lower()
+        
+        if range_input == 'all':
+            selected_files = script_files
+            print(f"✅ Processing ALL {len(script_files)} files")
+        else:
+            try:
+                if '-' not in range_input:
+                    print("❌ Invalid format! Use format: '1-5' or 'all'")
+                    return False
+                
+                start_str, end_str = range_input.split('-')
+                start_idx = int(start_str.strip())
+                end_idx = int(end_str.strip())
+                
+                if start_idx < 1 or end_idx > len(script_files) or start_idx > end_idx:
+                    print(f"❌ Invalid range! Must be between 1-{len(script_files)}")
+                    return False
+                
+                selected_files = script_files[start_idx-1:end_idx]
+                print(f"✅ Processing files {start_idx}-{end_idx} ({len(selected_files)} files)")
+                
+            except ValueError:
+                print("❌ Invalid input! Use format: '1-5' or 'all'")
+                return False
+        
+        # Show selected files
+        print("\n📋 Selected files:")
+        for idx, script_file in enumerate(selected_files, 1):
+            print(f"   • {script_file.name}")
+        
+        # Ask for confirmation
+        confirmation = input(f"\nGenerate {len(selected_files)} tests? [y/N]: ").strip().lower()
+        
+        if confirmation not in ['y', 'yes']:
+            print("❌ Bulk generation cancelled")
+            return False
+        
+        print("=" * 70)
+        
+        # Statistics
+        success_count = 0
+        failed_count = 0
+        failed_files = []
+        
+        # Process each script
+        for idx, script_file in enumerate(selected_files, 1):
+            print(f"\n[{idx}/{len(selected_files)}] Processing: {script_file.name}")
+            print("-" * 70)
+            
+            try:
+                # Set current script
+                self.existing_script = script_file
+                
+                # Extract test name from filename (remove timestamp if exists)
+                test_name = script_file.stem
+                # Remove timestamp pattern (YYYYMMDD_HHMMSS)
+                import re
+                test_name = re.sub(r'_\d{8}_\d{6}$', '', test_name)
+                self.test_name = test_name
+                
+                # Create structure for this test
+                self.create_structure()
+                
+                # Generate from existing
+                recorded_file = self.generate_from_existing()
+                if not recorded_file:
+                    failed_count += 1
+                    failed_files.append(script_file.name)
+                    print(f"   ❌ Failed to generate test from {script_file.name}")
+                    continue
+                
+                # Enhance the test
+                self.enhance_test(recorded_file)
+                
+                # Make it runnable
+                self.create_test_runner(recorded_file)
+                
+                success_count += 1
+                print(f"   ✅ Successfully generated: {self.test_name}")
+                
+            except Exception as e:
+                failed_count += 1
+                failed_files.append(script_file.name)
+                print(f"   ❌ Error processing {script_file.name}: {e}")
+                continue
+        
+        # Show summary
+        print("\n" + "=" * 70)
+        print("📊 BULK GENERATION SUMMARY")
+        print("=" * 70)
+        print(f"✅ Success: {success_count}/{len(selected_files)} tests")
+        print(f"❌ Failed:  {failed_count}/{len(selected_files)} tests")
+        
+        if failed_files:
+            print(f"\n❌ Failed files:")
+            for fname in failed_files:
+                print(f"   • {fname}")
+        
+        priority_info = self.PRIORITIES[self.priority]
+        print(f"\n📁 Location: {self.base_folder}/{priority_info['folder']}")
+        print(f"📊 Priority: {self.priority.upper()} - {priority_info['name']}")
+        
+        print("\n📋 How to run all tests:")
+        print("   python3 run_tests_interactive.py")
+        print(f"   Then select: {self.priority.upper()} → Run all tests")
+        
+        return True
         print("\n✨ That's it! Simple and working!")
 
 
