@@ -3,7 +3,7 @@ from playwright.sync_api import Page, expect
 import pytest
 
 
-@pytest.mark.regression
+@pytest.mark.smoke
 def test_example(page: Page) -> None:
     page.goto("https://map.chronicle.rip/")
 
@@ -46,13 +46,18 @@ def test_example(page: Page) -> None:
     expect(page.get_by_text("Auckland Memorial Park &")).to_be_visible()
     expect(page.get_by_test_id("auckland-memorial-park-cemetery-plots-hla2-l-11-mat-expansion-panel-header-h3-person-full-name").locator("span")).to_contain_text("Carlos Jay Humphris")
     page.get_by_test_id("autocomplete-base-routing-input-autocomplete-search-input").click()
-    page.get_by_test_id("autocomplete-base-routing-input-autocomplete-search-input").fill("HLA2-L-12")
+    
+    # Wait for search API response
+    with page.wait_api_response("v1_search_plots-records-persons_list"):
+        page.get_by_test_id("autocomplete-base-routing-input-autocomplete-search-input").fill("HLA2-L-12")
+    
     expect(page.locator("cl-search-plot-item")).to_be_visible()
     expect(page.get_by_test_id("auckland-memorial-park-cemetery-plots-hla2-l-11-search-plot-item-span-title").locator("span")).to_contain_text("HLA2-L-12")
     expect(page.get_by_test_id("auckland-memorial-park-cemetery-plots-hla2-l-11-search-plot-item-span-plot-label")).to_contain_text("Reserved")
     page.locator("cl-search-plot-item").click()
+
     expect(page.get_by_test_id("auckland-memorial-park-cemetery-plots-hla2-l-11-plot-details-public-div-main-title").get_by_text("HLA2-L-")).to_be_visible()
-    page.goto("https://map.chronicle.rip/Auckland_Memorial_Park_Cemetery/plots/HLA2-L-12?from=map&zoom=24&backTo=%2FAuckland_Memorial_Park_Cemetery%2Fplots%2FHLA2-L-11%3Ffrom%3Dmap%26zoom%3D24")
+    # page.goto("https://map.chronicle.rip/Auckland_Memorial_Park_Cemetery/plots/HLA2-L-12?from=map&zoom=24&backTo=%2FAuckland_Memorial_Park_Cemetery%2Fplots%2FHLA2-L-11%3Ffrom%3Dmap%26zoom%3D24")
 
     # Wait for page to load
     page.wait_for_load_state('load')

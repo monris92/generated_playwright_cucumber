@@ -9,6 +9,52 @@ from datetime import datetime
 from playwright.sync_api import Page
 from pytest_html import extras
 import base64
+from contextlib import contextmanager
+
+
+# =============================================================================
+# Page Helper Extensions
+# =============================================================================
+
+@contextmanager
+def wait_api_response(page: Page, endpoint: str, timeout: int = 10000):
+    """
+    Helper to wait for specific API endpoint response.
+    
+    Usage:
+        with page.wait_api_response("v1_search_plots-records-persons_list"):
+            page.get_by_test_id("search-input").fill("search term") << ini adalah aksi sebelum validasi element yang akan di validasi.
+        page.get_by_test_id("autocomplete-base-routing-input-autocomplete-search-input").click()
+    
+    ## contoh penggunaan actual :
+    # Wait for search API response
+    with page.wait_api_response("v1_search_plots-records-persons_list"):
+        page.get_by_test_id("autocomplete-base-routing-input-autocomplete-search-input").fill("HLA2-L-12")
+    
+    expect(page.locator("cl-search-plot-item")).to_be_visible()
+
+
+    Args:
+        page: Playwright Page object
+        endpoint: Part of the API endpoint URL to wait for
+        timeout: Timeout in milliseconds (default: 10000)
+    """
+    with page.expect_response(lambda r: endpoint in r.url, timeout=timeout):
+        yield
+
+
+# Monkey-patch the Page class to add convenience method
+def _wait_api_response(self, endpoint: str, timeout: int = 10000):
+    """
+    Convenience method for waiting on API responses.
+    
+    Usage:
+        with page.wait_api_response("v1_search_plots-records-persons_list"):
+            page.get_by_test_id("search-input").fill("search term")
+    """
+    return wait_api_response(self, endpoint, timeout)
+
+Page.wait_api_response = _wait_api_response
 
 
 

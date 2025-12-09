@@ -270,6 +270,19 @@ class ChronicleEnhancer:
                             i += 1
                             continue
 
+            # === DETECT FILL + EXPECT PATTERN - DISABLED ===
+            # Note: expect().to_be_visible() already has built-in polling (5s timeout)
+            # No need to add explicit waits - it handles API delays automatically
+            # if '.fill(' in line:
+            #     is_search = any(keyword in line.lower() for keyword in [
+            #         'search', 'autocomplete', 'filter', 'query'
+            #     ])
+            #     if is_search:
+            #         next_idx = self._find_next_code_line(lines, i + 1)
+            #         if next_idx and 'expect(' in lines[next_idx]:
+            #             # Skip - expect() handles waiting automatically
+            #             pass
+
             # === REMOVE UNNECESSARY WAITS ===
             # Remove redundant .wait_for() before .click() if we already added smart wait
             if '.wait_for(' in line and 'state=' in line:
