@@ -121,12 +121,17 @@ class SimpleRecorder:
         # Output to test-specific folder (with or without category)
         priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
         
+        # Use original script name to preserve specificity
+        original_name = self.existing_script.stem  # Remove .py extension
+        test_filename = f"{original_name}_test.py"
+        
         if self.category:
             test_folder = priority_folder / self.category / self.test_name
         else:
             test_folder = priority_folder / self.test_name
             
-        output_file = test_folder / "tests" / f"{self.test_name}_test.py"
+        # Put test file directly in test_folder (no redundant 'tests/' subfolder)
+        output_file = test_folder / test_filename
 
         try:
             # Read the existing script
@@ -237,8 +242,8 @@ class SimpleRecorder:
             if categories:
                 print(f"\n   Existing categories in {self.priority.upper()}:")
                 for cat in sorted(categories):
-                    # Count tests in category
-                    test_count = len(list(cat.glob("*/tests/*_test.py")))
+                    # Count tests in category (flat structure - no tests/ subfolder)
+                    test_count = len(list(cat.glob("*/*_test.py")))
                     print(f"   • {cat.name} ({test_count} tests)")
                 print()
         
@@ -284,12 +289,11 @@ class SimpleRecorder:
             test_folder = priority_folder / self.test_name
             path_display = f"{priority_info['folder']}/{self.test_name}/"
 
-        # Create folders (only tests/, no reports/)
+        # Create folders (flat structure - no tests/ subfolder)
         folders = [
             self.base_folder,
             priority_folder,
-            test_folder,
-            test_folder / "tests"
+            test_folder
         ]
 
         # Add category folder if needed
@@ -344,12 +348,14 @@ class SimpleRecorder:
                     test_folder = priority_folder / self.category / self.test_name
                 else:
                     test_folder = priority_folder / self.test_name
-                    
-                output_file = test_folder / "tests" / f"{self.test_name}_test.py"
+                
+                # Use timestamped filename to match codegen script naming
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                test_filename = f"{self.test_name}_{timestamp}_test.py"
+                output_file = test_folder / test_filename
 
-                # Ensure tests directory exists
-                tests_dir = test_folder / "tests"
-                tests_dir.mkdir(parents=True, exist_ok=True)
+                # Ensure test folder exists
+                test_folder.mkdir(parents=True, exist_ok=True)
 
                 # Copy the content
                 output_file.write_text(codegen_file.read_text())

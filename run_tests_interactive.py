@@ -126,16 +126,17 @@ class InteractiveTestRunner:
             if not item.is_dir() or item.name.startswith('.'):
                 continue
 
-            # First check if it has subdirectories with tests (category structure)
+            # First check if it has subdirectories (category structure)
             has_test_subdirs = False
             category_test_count = 0
             for subitem in sorted(item.iterdir()):
                 if not subitem.is_dir() or subitem.name.startswith('.'):
                     continue
-                sub_tests = subitem / "tests"
-                if sub_tests.exists() and list(sub_tests.glob("*_test.py")):
+                # Check for test files directly in subitem (flat structure)
+                sub_test_files = list(subitem.glob("*_test.py"))
+                if sub_test_files:
                     has_test_subdirs = True
-                    category_test_count += len(list(sub_tests.glob("*_test.py")))
+                    category_test_count += len(sub_test_files)
 
             if has_test_subdirs:
                 # It's a category folder
@@ -146,16 +147,14 @@ class InteractiveTestRunner:
                 })
             else:
                 # Check if it's a direct test folder (flat structure)
-                tests_folder = item / "tests"
-                if tests_folder.exists():
-                    test_files = list(tests_folder.glob("*_test.py"))
-                    if test_files:
-                        flat_tests.append({
-                            'name': item.name,
-                            'folder': item,
-                            'test_files': test_files,
-                            'test_count': len(test_files)
-                        })
+                test_files = list(item.glob("*_test.py"))
+                if test_files:
+                    flat_tests.append({
+                        'name': item.name,
+                        'folder': item,
+                        'test_files': test_files,
+                        'test_count': len(test_files)
+                    })
 
         return categories, flat_tests
 
@@ -172,16 +171,15 @@ class InteractiveTestRunner:
             if not test_folder.is_dir() or test_folder.name.startswith('.'):
                 continue
 
-            tests_dir = test_folder / "tests"
-            if tests_dir.exists():
-                test_files = list(tests_dir.glob("*_test.py"))
-                if test_files:
-                    tests.append({
-                        'name': test_folder.name,
-                        'folder': test_folder,
-                        'test_files': test_files,
-                        'test_count': len(test_files)
-                    })
+            # Look for test files directly in test_folder (flat structure)
+            test_files = list(test_folder.glob("*_test.py"))
+            if test_files:
+                tests.append({
+                    'name': test_folder.name,
+                    'folder': test_folder,
+                    'test_files': test_files,
+                    'test_count': len(test_files)
+                })
 
         return tests
 
@@ -284,10 +282,10 @@ class InteractiveTestRunner:
         if not priority_folder.exists():
             return 0
 
-        # Count both flat structure (priority/test/tests/*.py) and 
-        # nested structure (priority/category/test/tests/*.py)
-        flat_tests = list(priority_folder.glob("*/tests/*_test.py"))
-        nested_tests = list(priority_folder.glob("*/*/tests/*_test.py"))
+        # Count both flat structure (priority/test/*.py) and 
+        # nested structure (priority/category/test/*.py)
+        flat_tests = list(priority_folder.glob("*/*_test.py"))
+        nested_tests = list(priority_folder.glob("*/*/*_test.py"))
         
         return len(flat_tests) + len(nested_tests)
 
@@ -345,7 +343,7 @@ class InteractiveTestRunner:
             test_folder = priority_folder / test_name
             test_path_display = f"{priority.upper()}/{test_name}"
         
-        tests_folder = test_folder / "tests"
+        # Test files are directly in test_folder (flat structure)
 
         print("\n" + "=" * 70)
         print(f"🚀 Running Test: {test_name}")
@@ -356,7 +354,7 @@ class InteractiveTestRunner:
         print()
 
         self._execute_pytest(
-            test_path=str(tests_folder),
+            test_path=str(test_folder),
             description=test_path_display
         )
 
