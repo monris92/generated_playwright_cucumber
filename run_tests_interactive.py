@@ -43,37 +43,52 @@ class InteractiveTestRunner:
         print("=" * 70)
         print()
 
-        # Step 1: Choose priority or all
-        priority = self.choose_priority()
+        while True:
+            # Step 1: Choose priority or all
+            priority = self.choose_priority()
 
-        if priority == 'all':
-            self.run_all_tests()
-            return
+            if priority == 'all':
+                self.run_all_tests()
+                return
 
-        # Step 2: Get categories and flat tests for the priority
-        categories, flat_tests = self.get_categories_and_tests(priority)
+            # Step 2: Get categories and flat tests for the priority
+            categories, flat_tests = self.get_categories_and_tests(priority)
 
-        if not categories and not flat_tests:
-            print(f"\n⚠️  No test scenarios found for {priority.upper()}")
-            print(f"   Create tests in: {self.base_folder / self.PRIORITIES[priority]['folder']}")
-            return
+            if not categories and not flat_tests:
+                print(f"\n⚠️  No test scenarios found for {priority.upper()}")
+                print(f"   Create tests in: {self.base_folder / self.PRIORITIES[priority]['folder']}")
+                return
 
-        # Step 3: Choose category, flat test, or all
-        selection = self.choose_category_or_test(priority, categories, flat_tests)
+            while True:
+                # Step 3: Choose category, flat test, or all
+                selection = self.choose_category_or_test(priority, categories, flat_tests)
 
-        if selection['type'] == 'all':
-            self.run_priority_tests(priority)
-        elif selection['type'] == 'category':
-            # Step 4: Choose specific test within category or all tests in category
-            category_name = selection['name']
-            test_choice = self.choose_test_in_category(priority, category_name)
-            
-            if test_choice == 'all':
-                self.run_category_tests(priority, category_name)
-            else:
-                self.run_specific_test(priority, test_choice, category_name)
-        else:  # flat test
-            self.run_specific_test(priority, selection['name'])
+                if selection['type'] == 'back':
+                    # Go back to priority selection
+                    break
+                
+                if selection['type'] == 'all':
+                    self.run_priority_tests(priority)
+                    return
+                elif selection['type'] == 'category':
+                    while True:
+                        # Step 4: Choose specific test within category or all tests in category
+                        category_name = selection['name']
+                        test_choice = self.choose_test_in_category(priority, category_name)
+                        
+                        if test_choice == 'back':
+                            # Go back to category selection
+                            break
+                        
+                        if test_choice == 'all':
+                            self.run_category_tests(priority, category_name)
+                            return
+                        else:
+                            self.run_specific_test(priority, test_choice, category_name)
+                            return
+                else:  # flat test
+                    self.run_specific_test(priority, selection['name'])
+                    return
 
     def choose_priority(self) -> str:
         """Let user choose test priority"""
@@ -126,37 +141,28 @@ class InteractiveTestRunner:
             if not item.is_dir() or item.name.startswith('.'):
                 continue
 
-            # First check if it has subdirectories (category structure)
+            # Check if this is a subcategory (public/login) - has category folders inside
             has_test_subdirs = False
             category_test_count = 0
             for subitem in sorted(item.iterdir()):
                 if not subitem.is_dir() or subitem.name.startswith('.'):
                     continue
-                # Check for test files in tests/ subfolder
-                if (subitem / "tests").exists():
-                    sub_test_files = list((subitem / "tests").glob("*_test.py"))
-                    if sub_test_files:
-                        has_test_subdirs = True
-                        category_test_count += len(sub_test_files)
-                # Also check for subcategory structure (public/login)
-                for sub_subitem in subitem.iterdir():
-                    if sub_subitem.is_dir() and not sub_subitem.name.startswith('.'):
-                        if (sub_subitem / "tests").exists():
-                            subsub_test_files = list((sub_subitem / "tests").glob("*_test.py"))
-                            if subsub_test_files:
-                                has_test_subdirs = True
-                                category_test_count += len(subsub_test_files)
+                # Count all test files recursively in this subcategory
+                sub_test_files = list(subitem.rglob("*_test.py"))
+                if sub_test_files:
+                    has_test_subdirs = True
+                    category_test_count += len(sub_test_files)
 
             if has_test_subdirs:
-                # It's a category folder
+                # It's a subcategory folder (public/login)
                 categories.append({
                     'name': item.name,
                     'folder': item,
                     'test_count': category_test_count
                 })
             else:
-                # Check if it's a direct test folder with tests/ subfolder
-                test_files = list((item / "tests").glob("*_test.py")) if (item / "tests").exists() else []
+                # Check if it's a direct test folder (flat structure)
+                test_files = list(item.glob("*_test.py"))
                 if test_files:
                     flat_tests.append({
                         'name': item.name,
@@ -235,14 +241,19 @@ class InteractiveTestRunner:
             print()
 
         print(f"   0. Run ALL tests in {priority.upper()}")
+        print(f"   b. Back to priority selection")
         print()
 
         while True:
+            choice = input(f"Choose [0-{len(options)}/b] (default: 0): ").strip().lower()
+            if not choice:
+                choice = '0'
+            
+            if choice in ['b', 'back']:
+                print("⬅️  Going back...")
+                return {'type': 'back'}
+            
             try:
-                choice = input(f"Choose [0-{len(options)}] (default: 0): ").strip()
-                if not choice:
-                    choice = '0'
-
                 choice_num = int(choice)
 
                 if choice_num == 0:
@@ -253,9 +264,9 @@ class InteractiveTestRunner:
                     print(f"✅ Selected: {selected['name']}")
                     return selected
                 else:
-                    print(f"❌ Invalid choice. Please choose 0-{len(options)}")
+                    print(f"❌ Invalid choice. Please choose 0-{len(options)} or 'b' for back")
             except ValueError:
-                print(f"❌ Invalid input. Please enter a number 0-{len(options)}")
+                print(f"❌ Invalid input. Please enter a number 0-{len(options)} or 'b' for back")
 
     def choose_test_in_category(self, priority: str, category_name: str) -> str:
         """Let user choose a specific test within a category"""
@@ -272,14 +283,19 @@ class InteractiveTestRunner:
             print()
 
         print(f"   0. Run ALL tests in '{category_name}'")
+        print(f"   b. Back to category selection")
         print()
 
         while True:
+            choice = input(f"Choose [0-{len(tests)}/b] (default: 0): ").strip().lower()
+            if not choice:
+                choice = '0'
+            
+            if choice in ['b', 'back']:
+                print("⬅️  Going back...")
+                return 'back'
+            
             try:
-                choice = input(f"Choose [0-{len(tests)}] (default: 0): ").strip()
-                if not choice:
-                    choice = '0'
-
                 choice_num = int(choice)
 
                 if choice_num == 0:
@@ -290,9 +306,9 @@ class InteractiveTestRunner:
                     print(f"✅ Selected: {selected['name']}")
                     return selected['name']
                 else:
-                    print(f"❌ Invalid choice. Please choose 0-{len(tests)}")
+                    print(f"❌ Invalid choice. Please choose 0-{len(tests)} or 'b' for back")
             except ValueError:
-                print(f"❌ Invalid input. Please enter a number 0-{len(tests)}")
+                print(f"❌ Invalid input. Please enter a number 0-{len(tests)} or 'b' for back")
 
     def count_tests(self, priority_folder: Path) -> int:
         """Count total test files in a priority folder (supports subcategory/category/test/)"""
