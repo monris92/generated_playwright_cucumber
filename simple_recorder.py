@@ -43,6 +43,7 @@ class SimpleRecorder:
         self.website_url = None
         self.priority = None
         self.category = None  # Category/folder for organizing tests
+        self.subcategory = None  # Sub-category (e.g. public, login)
         self.mode = None  # 'record' or 'generate'
         self.existing_script = None  # Path to existing script if mode is 'generate'
 
@@ -56,6 +57,10 @@ class SimpleRecorder:
 
         # Get inputs
         self.get_inputs()
+
+        # If bulk generate mode, process all scripts
+        if self.mode == 'bulk_generate':
+            return self.bulk_generate_from_all()
 
         # Create structure
         self.create_structure()
@@ -118,15 +123,25 @@ class SimpleRecorder:
 
         print(f"\n📋 Generating test from: {self.existing_script.name}")
 
-        # Output to test-specific folder (with or without category)
+        # Output to test-specific folder (subcategory/category/test)
         priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
         
-        if self.category:
+        # Use test_name for the test file
+        test_filename = f"{self.test_name}_test.py"
+        
+        # Build path: priority → subcategory → category → test
+        if self.subcategory:
+            if self.category:
+                test_folder = priority_folder / self.subcategory / self.category / self.test_name
+            else:
+                test_folder = priority_folder / self.subcategory / self.test_name
+        elif self.category:
             test_folder = priority_folder / self.category / self.test_name
         else:
             test_folder = priority_folder / self.test_name
             
-        output_file = test_folder / "tests" / f"{self.test_name}_test.py"
+        # Put test file directly in test folder (no tests/ subfolder)
+        output_file = test_folder / test_filename
 
         try:
             # Read the existing script
@@ -178,24 +193,41 @@ class SimpleRecorder:
                 break
             print("❌ Please enter 1, 2, or 3")
 
-        # Get category
+        # Get category/folder first (after priority)
         self.get_category()
 
         # Ask mode: record new or generate from existing
         print("\n🎯 Choose mode:")
         print("   1. Record new test (open browser and record)")
-        print("   2. Generate from existing script (use script from codegen_script folder)")
+        print("   2. Generate from existing script (single file)")
+        print("   3. Bulk generate from ALL scripts in codegen_script folder")
 
         while True:
-            mode_choice = input("Choose mode [1-2] (default: 1): ").strip()
+            mode_choice = input("Choose mode [1-3] (default: 1): ").strip()
             if not mode_choice:
                 mode_choice = '1'
 
-            if mode_choice in ['1', '2']:
-                self.mode = 'record' if mode_choice == '1' else 'generate'
-                print(f"✅ Mode: {'Record new test' if self.mode == 'record' else 'Generate from existing script'}")
+            if mode_choice in ['1', '2', '3']:
+                if mode_choice == '1':
+                    self.mode = 'record'
+                elif mode_choice == '2':
+                    self.mode = 'generate'
+                else:
+                    self.mode = 'bulk_generate'
+                
+                mode_text = {
+                    'record': 'Record new test',
+                    'generate': 'Generate from existing script',
+                    'bulk_generate': 'Bulk generate from ALL scripts'
+                }
+                print(f"✅ Mode: {mode_text[self.mode]}")
                 break
-            print("❌ Please enter 1 or 2")
+            print("❌ Please enter 1, 2, or 3")
+
+        # If bulk generate mode, skip test name input
+        if self.mode == 'bulk_generate':
+            self.test_name = None  # Will be extracted from filenames
+            return  # Skip to bulk generation
 
         # If generate mode, select existing script
         if self.mode == 'generate':
@@ -224,28 +256,64 @@ class SimpleRecorder:
             self.website_url = "Generated from existing script"
 
     def get_category(self):
-        """Get or create category for organizing tests"""
+        """Get subcategory and category for organizing tests"""
         priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
         
-        print(f"\n📂 Category/Feature (e.g., 'advance_search', 'interment', 'plot'):")
+        # First ask for subcategory (public/login) - now as menu
+        print(f"\n📂 Sub-category:")
+        print("   1. public  - Public user tests (no login required)")
+        print("   2. login   - Logged-in user tests (requires authentication)")
+        
+        # Show existing test counts
+        if priority_folder.exists():
+            public_count = 0
+            login_count = 0
+            public_folder = priority_folder / "public"
+            login_folder = priority_folder / "login"
+            
+            if public_folder.exists():
+                public_count = len(list(public_folder.rglob("*_test.py")))
+            if login_folder.exists():
+                login_count = len(list(login_folder.rglob("*_test.py")))
+            
+            print(f"\n   Current tests: public ({public_count}), login ({login_count})")
+        
+        while True:
+            choice = input("\nChoose sub-category [1-2]: ").strip()
+            
+            if choice == '1':
+                self.subcategory = 'public'
+                print("✅ Sub-category: public")
+                break
+            elif choice == '2':
+                self.subcategory = 'login'
+                print("✅ Sub-category: login")
+                break
+            else:
+                print("❌ Please enter 1 or 2")
+        
+        # Then ask for category (advance_search, person, search)
+        print(f"\n📂 Category/Feature (e.g., 'advance_search', 'person', 'search'):")
         print("   This groups related tests together")
         
-        # Show existing categories if any
-        if priority_folder.exists():
-            categories = [d for d in priority_folder.iterdir() 
-                         if d.is_dir() and not d.name.startswith('.')]
-            if categories:
-                print(f"\n   Existing categories in {self.priority.upper()}:")
-                for cat in sorted(categories):
-                    # Count tests in category
-                    test_count = len(list(cat.glob("*/tests/*_test.py")))
-                    print(f"   • {cat.name} ({test_count} tests)")
-                print()
+        # Show existing categories in selected subcategory
+        if self.subcategory and priority_folder.exists():
+            subcat_folder = priority_folder / self.subcategory
+            if subcat_folder.exists():
+                categories = [d for d in subcat_folder.iterdir() 
+                             if d.is_dir() and not d.name.startswith('.')]
+                if categories:
+                    print(f"\n   Existing categories in {self.subcategory}:")
+                    for cat in sorted(categories):
+                        # Count tests in category
+                        test_count = len(list(cat.glob("*/*/*_test.py")))
+                        print(f"   • {cat.name} ({test_count} tests)")
+                    print()
         
         while True:
             category = input("Enter category name (or press Enter to skip): ").strip().lower()
             
-            # Allow empty for flat structure (no category)
+            # Allow empty for flat structure
             if not category:
                 self.category = None
                 print("✅ No category - test will be in flat structure")
@@ -254,47 +322,49 @@ class SimpleRecorder:
             # Validate category name
             if category.replace('_', '').replace('-', '').isalnum():
                 self.category = category
-                
-                # Check if category exists
-                if priority_folder.exists():
-                    category_path = priority_folder / category
-                    if category_path.exists():
-                        print(f"✅ Using existing category: {category}")
-                    else:
-                        print(f"✅ Will create new category: {category}")
-                else:
-                    print(f"✅ Will create new category: {category}")
+                print(f"✅ Category: {category}")
                 break
             
             print("❌ Use only letters, numbers, hyphens, and underscores")
 
     def create_structure(self):
-        """Create folder structure with priority and optional category organization"""
+        """Create folder structure: priority/subcategory/category/test/tests/"""
         print(f"\n📂 Creating test structure...")
 
         # Get priority folder info
         priority_info = self.PRIORITIES[self.priority]
         priority_folder = self.base_folder / priority_info['folder']
 
-        # Build path with or without category
-        if self.category:
+        # Build path: priority → subcategory → category → test
+        if self.subcategory:
+            if self.category:
+                test_folder = priority_folder / self.subcategory / self.category / self.test_name
+                path_display = f"{priority_info['folder']}/{self.subcategory}/{self.category}/{self.test_name}"
+            else:
+                test_folder = priority_folder / self.subcategory / self.test_name
+                path_display = f"{priority_info['folder']}/{self.subcategory}/{self.test_name}"
+        elif self.category:
             test_folder = priority_folder / self.category / self.test_name
-            path_display = f"{priority_info['folder']}/{self.category}/{self.test_name}/"
+            path_display = f"{priority_info['folder']}/{self.category}/{self.test_name}"
         else:
             test_folder = priority_folder / self.test_name
-            path_display = f"{priority_info['folder']}/{self.test_name}/"
+            path_display = f"{priority_info['folder']}/{self.test_name}"
 
-        # Create folders (only tests/, no reports/)
+        # Create folders (without tests/ subfolder for simplicity)
         folders = [
             self.base_folder,
-            priority_folder,
-            test_folder,
-            test_folder / "tests"
+            priority_folder
         ]
 
-        # Add category folder if needed
-        if self.category:
-            folders.insert(2, priority_folder / self.category)
+        # Add subcategory and category folders if needed
+        if self.subcategory:
+            folders.append(priority_folder / self.subcategory)
+            if self.category:
+                folders.append(priority_folder / self.subcategory / self.category)
+        elif self.category:
+            folders.append(priority_folder / self.category)
+        
+        folders.append(test_folder)
 
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
@@ -337,19 +407,26 @@ class SimpleRecorder:
             if codegen_file.exists():
                 print(f"✅ Original script saved: {codegen_file}")
 
-                # Copy to test folder (with or without category)
+                # Copy to test folder (subcategory/category/test)
                 priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
                 
-                if self.category:
+                # Build path: priority → subcategory → category → test
+                if self.subcategory:
+                    if self.category:
+                        test_folder = priority_folder / self.subcategory / self.category / self.test_name
+                    else:
+                        test_folder = priority_folder / self.subcategory / self.test_name
+                elif self.category:
                     test_folder = priority_folder / self.category / self.test_name
                 else:
                     test_folder = priority_folder / self.test_name
-                    
-                output_file = test_folder / "tests" / f"{self.test_name}_test.py"
+                
+                # Use simple test filename (no timestamp in final test file)
+                test_filename = f"{self.test_name}_test.py"
+                output_file = test_folder / test_filename
 
-                # Ensure tests directory exists
-                tests_dir = test_folder / "tests"
-                tests_dir.mkdir(parents=True, exist_ok=True)
+                # Ensure test folder exists
+                test_folder.mkdir(parents=True, exist_ok=True)
 
                 # Copy the content
                 output_file.write_text(codegen_file.read_text())
@@ -369,30 +446,31 @@ class SimpleRecorder:
             return None
 
     def enhance_test(self, test_file):
-        """Enhance the recorded test with smart waits and fixes"""
-        print("\n🔧 Enhancing test with smart waits...")
+        """Enhance the recorded test with Chronicle-specific improvements"""
+        print("\n🔧 Enhancing test with Chronicle patterns...")
 
         try:
-            # Import the enhancer
-            from utils.test_enhancer import TestEnhancer
+            # Import the Chronicle enhancer
+            from utils.chronicle_enhancer import ChronicleEnhancer
 
             # Get priority marker
             marker = self.PRIORITIES[self.priority]['marker']
 
-            enhancer = TestEnhancer(test_file)
-            enhancer.enhance_in_place(marker=marker)
+            enhancer = ChronicleEnhancer(test_file)
+            enhancer.enhance(marker=marker)
 
             print("✅ Test enhanced with:")
-            print("   • Simple, reliable waits after page.goto()")
-            print("   • Smart button click strategies:")
-            print("     - Verify element visible and ENABLED")
-            print("     - Wait for animations (500ms)")
-            print("     - Click with delay (200ms)")
-            print("   • Element visibility checks before assertions")
-            print("   • URL validation instead of redundant page.goto()")
+            print("   • Dynamic async waits (no static timeouts)")
+            print("   • Table data polling (wait for actual content)")
+            print("   • Natural navigation after login (preserve auth tokens)")
+            print("   • Optimized selectors (shorter, more flexible)")
             print(f"   • Pytest marker: @pytest.mark.{marker}")
             print()
-            print("   ℹ️  Using simple timeouts (not networkidle) for reliability")
+            print(f"📊 Enhancement Statistics:")
+            print(f"   • Dynamic waits added: {enhancer.stats['dynamic_waits_added']}")
+            print(f"   • Table polling added: {enhancer.stats['table_polls_added']}")
+            print(f"   • Login flows fixed: {enhancer.stats['login_flows_fixed']}")
+            print(f"   • Selectors optimized: {enhancer.stats['selectors_optimized']}")
 
         except Exception as e:
             print(f"⚠️  Enhancement skipped: {e}")
@@ -409,15 +487,22 @@ class SimpleRecorder:
         print("🎉 SUCCESS! Your test is ready!")
         print("=" * 70)
         
-        # Build path display
+        # Build path display (subcategory → category → test)
         priority_info = self.PRIORITIES[self.priority]
-        if self.category:
+        if self.subcategory:
+            if self.category:
+                test_path = f"{priority_info['folder']}/{self.subcategory}/{self.category}/{self.test_name}"
+            else:
+                test_path = f"{priority_info['folder']}/{self.subcategory}/{self.test_name}"
+        elif self.category:
             test_path = f"{priority_info['folder']}/{self.category}/{self.test_name}"
         else:
             test_path = f"{priority_info['folder']}/{self.test_name}"
         
         print(f"\n📁 Location: {self.base_folder}/{test_path}")
         print(f"🏷️  Test: {self.test_name}")
+        if self.subcategory:
+            print(f"📂 Sub-category: {self.subcategory}")
         if self.category:
             print(f"📂 Category: {self.category}")
         print(f"📊 Priority: {self.priority.upper()} - {priority_info['name']}")
@@ -425,9 +510,154 @@ class SimpleRecorder:
         print("\n📋 How to run your test:")
         print("   python3 run_tests_interactive.py")
         print(f"   Then select: {self.priority.upper()}", end="")
-        if self.category:
-            print(f" → {self.category}", end="")
+        if self.subcategory:
+            print(f" → {self.subcategory}", end="")
+            if self.category:
+                print(f" → {self.category}", end="")
         print(f" → {self.test_name}")
+
+    def bulk_generate_from_all(self):
+        """Bulk generate tests from all scripts in codegen_script folder"""
+        codegen_folder = Path("codegen_script")
+        
+        if not codegen_folder.exists():
+            print(f"\n❌ Folder 'codegen_script' not found!")
+            return False
+        
+        # Find all Python files and sort alphabetically
+        script_files = sorted(list(codegen_folder.glob("*.py")), key=lambda x: x.name.lower())
+        
+        if not script_files:
+            print(f"\n❌ No Python scripts found in 'codegen_script' folder!")
+            return False
+        
+        print(f"\n📦 Found {len(script_files)} scripts to process")
+        priority_info = self.PRIORITIES[self.priority]
+        if self.subcategory:
+            if self.category:
+                target_path = f"{priority_info['folder']}/{self.subcategory}/{self.category}"
+            else:
+                target_path = f"{priority_info['folder']}/{self.subcategory}"
+        elif self.category:
+            target_path = f"{priority_info['folder']}/{self.category}"
+        else:
+            target_path = priority_info['folder']
+        print(f"📁 Target folder: {self.base_folder / target_path}")
+        print("\n📄 Files:")
+        for idx, script_file in enumerate(script_files, 1):
+            print(f"   {idx:2d}. {script_file.name}")
+        
+        # Ask for range selection
+        print(f"\n🎯 Select range to process (1-{len(script_files)})")
+        print("   Examples: '1-5' or '10-15' or 'all' for all files")
+        range_input = input("Enter range: ").strip().lower()
+        
+        if range_input == 'all':
+            selected_files = script_files
+            print(f"✅ Processing ALL {len(script_files)} files")
+        else:
+            try:
+                if '-' not in range_input:
+                    print("❌ Invalid format! Use format: '1-5' or 'all'")
+                    return False
+                
+                start_str, end_str = range_input.split('-')
+                start_idx = int(start_str.strip())
+                end_idx = int(end_str.strip())
+                
+                if start_idx < 1 or end_idx > len(script_files) or start_idx > end_idx:
+                    print(f"❌ Invalid range! Must be between 1-{len(script_files)}")
+                    return False
+                
+                selected_files = script_files[start_idx-1:end_idx]
+                print(f"✅ Processing files {start_idx}-{end_idx} ({len(selected_files)} files)")
+                
+            except ValueError:
+                print("❌ Invalid input! Use format: '1-5' or 'all'")
+                return False
+        
+        # Show selected files
+        print("\n📋 Selected files:")
+        for idx, script_file in enumerate(selected_files, 1):
+            print(f"   • {script_file.name}")
+        
+        # Ask for confirmation
+        confirmation = input(f"\nGenerate {len(selected_files)} tests? [y/N]: ").strip().lower()
+        
+        if confirmation not in ['y', 'yes']:
+            print("❌ Bulk generation cancelled")
+            return False
+        
+        print("=" * 70)
+        
+        # Statistics
+        success_count = 0
+        failed_count = 0
+        failed_files = []
+        
+        # Process each script
+        for idx, script_file in enumerate(selected_files, 1):
+            print(f"\n[{idx}/{len(selected_files)}] Processing: {script_file.name}")
+            print("-" * 70)
+            
+            try:
+                # Set current script
+                self.existing_script = script_file
+                
+                # Extract test name from filename (remove timestamp if exists)
+                test_name = script_file.stem
+                # Remove timestamp pattern (YYYYMMDD_HHMMSS)
+                import re
+                test_name = re.sub(r'_\d{8}_\d{6}$', '', test_name)
+                self.test_name = test_name
+                
+                # Create structure for this test
+                self.create_structure()
+                
+                # Generate from existing
+                recorded_file = self.generate_from_existing()
+                if not recorded_file:
+                    failed_count += 1
+                    failed_files.append(script_file.name)
+                    print(f"   ❌ Failed to generate test from {script_file.name}")
+                    continue
+                
+                # Enhance the test
+                self.enhance_test(recorded_file)
+                
+                # Make it runnable
+                self.create_test_runner(recorded_file)
+                
+                success_count += 1
+                print(f"   ✅ Successfully generated: {self.test_name}")
+                
+            except Exception as e:
+                failed_count += 1
+                failed_files.append(script_file.name)
+                print(f"   ❌ Error processing {script_file.name}: {e}")
+                continue
+        
+        # Show summary
+        print("\n" + "=" * 70)
+        print("📊 BULK GENERATION SUMMARY")
+        print("=" * 70)
+        print(f"✅ Success: {success_count}/{len(selected_files)} tests")
+        print(f"❌ Failed:  {failed_count}/{len(selected_files)} tests")
+        
+        if failed_files:
+            print(f"\n❌ Failed files:")
+            for fname in failed_files:
+                print(f"   • {fname}")
+        
+        priority_info = self.PRIORITIES[self.priority]
+        print(f"\n📁 Location: {self.base_folder}/{priority_info['folder']}")
+        print(f"📊 Priority: {self.priority.upper()} - {priority_info['name']}")
+        
+        print("\n📋 How to run all tests:")
+        print("   python3 run_tests_interactive.py")
+        print(f"   Then select: {self.priority.upper()} → Run all tests")
+        
+        return True
         print("\n✨ That's it! Simple and working!")
 
 
