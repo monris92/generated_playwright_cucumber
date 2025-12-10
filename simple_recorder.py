@@ -259,33 +259,38 @@ class SimpleRecorder:
         """Get subcategory and category for organizing tests"""
         priority_folder = self.base_folder / self.PRIORITIES[self.priority]['folder']
         
-        # First ask for subcategory (public/login)
-        print(f"\n📂 Sub-category (e.g., 'public', 'login'):")
-        print("   Optional: Press Enter to skip")
+        # First ask for subcategory (public/login) - now as menu
+        print(f"\n📂 Sub-category:")
+        print("   1. public  - Public user tests (no login required)")
+        print("   2. login   - Logged-in user tests (requires authentication)")
         
-        # Show existing subcategories if any
+        # Show existing test counts
         if priority_folder.exists():
-            subcategories = [d for d in priority_folder.iterdir() 
-                           if d.is_dir() and not d.name.startswith('.')]
-            if subcategories:
-                print(f"\n   Existing sub-categories in {self.priority.upper()}:")
-                for subcat in sorted(subcategories):
-                    # Count tests in subcategory
-                    test_count = len(list(subcat.glob("*/*/*/*_test.py")))
-                    print(f"   • {subcat.name} ({test_count} tests)")
-                print()
+            public_count = 0
+            login_count = 0
+            public_folder = priority_folder / "public"
+            login_folder = priority_folder / "login"
+            
+            if public_folder.exists():
+                public_count = len(list(public_folder.rglob("*_test.py")))
+            if login_folder.exists():
+                login_count = len(list(login_folder.rglob("*_test.py")))
+            
+            print(f"\n   Current tests: public ({public_count}), login ({login_count})")
         
-        subcategory = input("Enter sub-category name: ").strip().lower()
-        if subcategory:
-            if subcategory.replace('_', '').replace('-', '').isalnum():
-                self.subcategory = subcategory
-                print(f"✅ Sub-category: {subcategory}")
+        while True:
+            choice = input("\nChoose sub-category [1-2]: ").strip()
+            
+            if choice == '1':
+                self.subcategory = 'public'
+                print("✅ Sub-category: public")
+                break
+            elif choice == '2':
+                self.subcategory = 'login'
+                print("✅ Sub-category: login")
+                break
             else:
-                print("⚠️  Invalid sub-category name, using none")
-                self.subcategory = None
-        else:
-            self.subcategory = None
-            print("✅ No sub-category")
+                print("❌ Please enter 1 or 2")
         
         # Then ask for category (advance_search, person, search)
         print(f"\n📂 Category/Feature (e.g., 'advance_search', 'person', 'search'):")
