@@ -60,7 +60,7 @@ class InteractiveTestRunner:
                 return
 
             while True:
-                # Step 3: Choose category, flat test, or all
+                # Step 3: Choose subcategory (public/login)
                 selection = self.choose_category_or_test(priority, categories, flat_tests)
 
                 if selection['type'] == 'back':
@@ -71,21 +71,40 @@ class InteractiveTestRunner:
                     self.run_priority_tests(priority)
                     return
                 elif selection['type'] == 'category':
+                    # This is a subcategory (public/login)
+                    subcategory_name = selection['name']
+                    
                     while True:
-                        # Step 4: Choose specific test within category or all tests in category
-                        category_name = selection['name']
-                        test_choice = self.choose_test_in_category(priority, category_name)
+                        # Step 4: Choose category within subcategory
+                        category_choice = self.choose_category_in_subcategory(priority, subcategory_name)
                         
-                        if test_choice == 'back':
-                            # Go back to category selection
+                        if category_choice == 'back':
+                            # Go back to subcategory selection
                             break
                         
-                        if test_choice == 'all':
-                            self.run_category_tests(priority, category_name)
+                        if category_choice == 'all':
+                            # Run all tests in subcategory
+                            self.run_category_tests(priority, subcategory_name)
                             return
-                        else:
-                            self.run_specific_test(priority, test_choice, category_name)
-                            return
+                        
+                        # Step 5: Choose specific test within category
+                        while True:
+                            test_choice = self.choose_test_in_category(priority, subcategory_name, category_choice)
+                            
+                            if test_choice == 'back':
+                                # Go back to category selection
+                                break
+                            
+                            if test_choice == 'all':
+                                # Run all tests in this category
+                                category_path = f"{subcategory_name}/{category_choice}"
+                                self.run_category_tests(priority, category_path)
+                                return
+                            else:
+                                # Run specific test
+                                test_path = f"{subcategory_name}/{category_choice}/{test_choice}"
+                                self.run_specific_test(priority, test_path)
+                                return
                 else:  # flat test
                     self.run_specific_test(priority, selection['name'])
                     return
@@ -173,36 +192,54 @@ class InteractiveTestRunner:
 
         return categories, flat_tests
 
-    def get_tests_in_category(self, priority: str, subcategory_name: str) -> List[Dict]:
-        """Get all categories and tests within a subcategory (e.g., public/login)"""
+    def get_categories_in_subcategory(self, priority: str, subcategory_name: str) -> List[Dict]:
+        """Get all categories within a subcategory (e.g., advance_search, person, search in login)"""
         priority_folder = self.base_folder / self.PRIORITIES[priority]['folder']
         subcategory_folder = priority_folder / subcategory_name
-        tests = []
+        categories = []
 
         if not subcategory_folder.exists():
-            return tests
+            return categories
 
-        # Scan categories inside subcategory (e.g., public/advance_search, login/person)
+        # Scan categories inside subcategory
         for category_item in sorted(subcategory_folder.iterdir()):
             if not category_item.is_dir() or category_item.name.startswith('.'):
                 continue
 
-            # Check if this category has test folders
-            has_test_folders = False
-            for test_folder in sorted(category_item.iterdir()):
-                if not test_folder.is_dir() or test_folder.name.startswith('.'):
-                    continue
-                
-                # Look for test files directly in test folder
-                test_files = list(test_folder.glob("*_test.py"))
-                if test_files:
-                    has_test_folders = True
-                    tests.append({
-                        'name': f"{category_item.name}/{test_folder.name}",
-                        'folder': test_folder,
-                        'test_files': test_files,
-                        'test_count': len(test_files)
-                    })
+            # Count test files in this category
+            test_count = len(list(category_item.rglob("*_test.py")))
+            if test_count > 0:
+                categories.append({
+                    'name': category_item.name,
+                    'folder': category_item,
+                    'test_count': test_count
+                })
+
+        return categories
+
+    def get_tests_in_category(self, priority: str, subcategory_name: str, category_name: str) -> List[Dict]:
+        """Get all tests within a specific category"""
+        priority_folder = self.base_folder / self.PRIORITIES[priority]['folder']
+        category_folder = priority_folder / subcategory_name / category_name
+        tests = []
+
+        if not category_folder.exists():
+            return tests
+
+        # Scan test folders in category
+        for test_folder in sorted(category_folder.iterdir()):
+            if not test_folder.is_dir() or test_folder.name.startswith('.'):
+                continue
+            
+            # Look for test files directly in test folder
+            test_files = list(test_folder.glob("*_test.py"))
+            if test_files:
+                tests.append({
+                    'name': test_folder.name,
+                    'folder': test_folder,
+                    'test_files': test_files,
+                    'test_count': len(test_files)
+                })
 
         return tests
 
@@ -268,11 +305,50 @@ class InteractiveTestRunner:
             except ValueError:
                 print(f"❌ Invalid input. Please enter a number 0-{len(options)} or 'b' for back")
 
-    def choose_test_in_category(self, priority: str, category_name: str) -> str:
-        """Let user choose a specific test within a category"""
-        tests = self.get_tests_in_category(priority, category_name)
+    def choose_category_in_subcategory(self, priority: str, subcategory_name: str) -> str:
+        """Let user choose a category within a subcategory"""
+        categories = self.get_categories_in_subcategory(priority, subcategory_name)
 
-        print(f"\n📋 Tests in category '{category_name}':")
+        print(f"\n📂 Categories in '{subcategory_name}':")
+        print()
+
+        for idx, category in enumerate(categories, 1):
+            print(f"   {idx}. {category['name']} ({category['test_count']} tests)")
+
+        print()
+        print(f"   0. Run ALL tests in '{subcategory_name}'")
+        print(f"   b. Back to subcategory selection")
+        print()
+
+        while True:
+            choice = input(f"Choose [0-{len(categories)}/b] (default: 0): ").strip().lower()
+            if not choice:
+                choice = '0'
+            
+            if choice in ['b', 'back']:
+                print("⬅️  Going back...")
+                return 'back'
+            
+            try:
+                choice_num = int(choice)
+
+                if choice_num == 0:
+                    print(f"✅ Selected: Run ALL tests in '{subcategory_name}'")
+                    return 'all'
+                elif 1 <= choice_num <= len(categories):
+                    selected = categories[choice_num - 1]
+                    print(f"✅ Selected: {selected['name']}")
+                    return selected['name']
+                else:
+                    print(f"❌ Invalid choice. Please choose 0-{len(categories)} or 'b' for back")
+            except ValueError:
+                print(f"❌ Invalid input. Please enter a number 0-{len(categories)} or 'b' for back")
+
+    def choose_test_in_category(self, priority: str, subcategory_name: str, category_name: str) -> str:
+        """Let user choose a specific test within a category"""
+        tests = self.get_tests_in_category(priority, subcategory_name, category_name)
+
+        print(f"\n📋 Tests in '{subcategory_name}/{category_name}':")
         print()
 
         for idx, test in enumerate(tests, 1):
