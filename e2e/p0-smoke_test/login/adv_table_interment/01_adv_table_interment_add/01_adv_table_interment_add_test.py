@@ -9,13 +9,14 @@ def test_example(page: Page) -> None:
 
     # Wait for page to load
     page.wait_for_load_state('load')
-    page.wait_for_timeout(10000)
+    page.wait_for_timeout(20000)
     expect(page.get_by_test_id("autocomplete-base-routing-div-search-field")).to_be_visible()
     expect(page.get_by_role("button", name="ADVANCED")).to_be_visible()
     expect(page.get_by_test_id("toolbar-a-about-chronicle")).to_be_visible()
     page.get_by_test_id("toolbar-a-mat-focus-indicator").click()
     expect(page.get_by_test_id("login-login-screen-h2-sign-in-text")).to_be_visible()
     expect(page.get_by_text("Or use Chronicle account")).to_be_visible()
+    page.wait_for_timeout(20000)
     expect(page.locator("div").filter(has_text=re.compile(r"^Email \*$"))).to_be_visible()
     page.locator("div").filter(has_text=re.compile(r"^Email \*$")).click()
     page.get_by_test_id("login-mat-form-field-input-mat-input-element").fill("faris+astanaorg@chronicle.rip")
@@ -56,9 +57,10 @@ def test_example(page: Page) -> None:
     expect(page.get_by_role("button", name="Astana Tegal Gunduls faris+")).to_be_visible()
     expect(page.get_by_test_id("customer-organization-side-menu-section-sectionId")).to_be_visible()
     page.get_by_role("button", name="Tables").click()
+    page.wait_for_timeout(2000)
 
     # Wait for navigation to tables page
-    page.wait_for_url("**/advance-table**", timeout=60000)
+    page.wait_for_url("**/advance-table**", timeout=500000)
     page.wait_for_load_state('load')
     page.wait_for_timeout(2000)
     expect(page.get_by_role("button", name="FILTER")).to_be_visible()
@@ -87,8 +89,9 @@ def test_example(page: Page) -> None:
     page.wait_for_timeout(5000)
     page.locator("mat-select[aria-label='Event Type']").click()
     page.wait_for_timeout(5000)
-    page.get_by_test_id("customer-organization-advance-table-manage-add-interment-table-input-start-typing-to-search").fill("a z")
-    page.get_by_role("option", name="A Z").click()
+    page.get_by_test_id("customer-organization-advance-table-manage-add-interment-table-input-start-typing-to-search").fill("a z 1")
+    page.wait_for_timeout(5000)
+    page.get_by_role("option", name="A Z 1").click()
     expect(page.get_by_role("button", name="Deceased person")).to_be_visible()
     page.get_by_role("textbox", name="First name").click()
     page.get_by_role("textbox", name="First name").fill("Kirito")
@@ -140,6 +143,18 @@ def test_example(page: Page) -> None:
 
     if not cell_has_content:
         raise Exception('Timeout: Gridcells remained empty after waiting for data to load')
+
+    expect(page.get_by_role("button", name="ADD INTERMENTS")).to_be_visible()
+    expect(page.get_by_role("button", name="EXPORT")).to_be_visible()
+    page.get_by_role("button", name="FILTER").click()
+    expect(page.get_by_test_id("customer-organization-advance-table-mat-dialog-container-h2-mat-dialog-title")).to_be_visible()
+    expect(page.locator("div").filter(has_text=re.compile(r"^Section$")).nth(2)).to_be_visible()
+    page.locator("div").filter(has_text=re.compile(r"^Section$")).nth(2).click()
+    page.get_by_role("option", name="A").click()
+    expect(page.locator("div").filter(has_text=re.compile(r"^Row$")).nth(2)).to_be_visible()
+    page.locator("div").filter(has_text=re.compile(r"^Row$")).nth(2).click()
+    page.get_by_placeholder("Row").fill("z")
+    page.get_by_role("button", name="APPLY").click()
 
     expect(page.get_by_role("gridcell", name="A Z")).to_be_visible()
     expect(page.get_by_role("gridcell", name="Kirito")).to_be_visible()
