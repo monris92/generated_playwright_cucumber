@@ -75,7 +75,7 @@ def test_example(page: Page) -> None:
     expect(page.get_by_role("button", name="ADD PLOT")).to_be_visible()
     expect(page.locator("a").filter(has_text="BUSINESS")).to_be_visible()
     expect(page.locator("a").filter(has_text="PERSONS")).to_be_visible()
-    expect(page.locator("a").filter(has_text="ROISX")).to_be_visible()
+    expect(page.locator("a").filter(has_text="ROIS")).to_be_visible()
     expect(page.locator("a").filter(has_text="INTERMENTS")).to_be_visible()
     page.locator("a").filter(has_text="INTERMENTS").click()
 
@@ -89,13 +89,13 @@ def test_example(page: Page) -> None:
     expect(page.get_by_test_id("customer-organization-advance-table-mat-dialog-container-h2-mat-dialog-title")).to_be_visible()
     expect(page.locator("div").filter(has_text=re.compile(r"^Section$")).nth(2)).to_be_visible()
     page.locator("div").filter(has_text=re.compile(r"^Section$")).nth(2).click()
-    page.get_by_role("option", name="A").click()
+    page.get_by_role("option", name="A", exact=True).click()
     expect(page.locator("div").filter(has_text=re.compile(r"^Row$")).nth(2)).to_be_visible()
     page.locator("div").filter(has_text=re.compile(r"^Row$")).nth(2).click()
     page.get_by_placeholder("Row").fill("Z")
     page.get_by_role("button", name="APPLY").click()
-    expect(page.get_by_test_id("customer-organization-advance-table-mat-sidenav-content-div-table-wrapper").get_by_text("Kirito")).to_be_visible()
-    expect(page.get_by_test_id("customer-organization-advance-table-mat-sidenav-content-div-table-wrapper").get_by_text("Kazuto")).to_be_visible()
+    expect(page.get_by_role("gridcell", name="Kirito")).to_be_visible()
+    expect(page.get_by_role("gridcell", name="Kazuto")).to_be_visible()
 
     # CRITICAL: Wait for table data to populate (not just DOM elements)
     # Table shows progressbars while loading, then replaces with actual data
@@ -178,7 +178,7 @@ def test_example(page: Page) -> None:
             page.wait_for_timeout(2000)
         except:
             pass  # Already on target page or link not found
-    expect(page.get_by_test_id("customer-organization-advance-table-mat-sidenav-content-div-table-wrapper").get_by_text("Kirito")).to_be_visible()
+    page.wait_for_timeout(2000)
     expect(page.get_by_role("gridcell", name="Kirito")).to_be_visible()
     expect(page.get_by_role("gridcell", name="Kazuto")).to_be_visible()
     expect(page.locator("a").filter(has_text="PLOTS")).to_be_visible()

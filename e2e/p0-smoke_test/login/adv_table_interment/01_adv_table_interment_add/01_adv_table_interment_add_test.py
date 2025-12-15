@@ -58,6 +58,8 @@ def test_example(page: Page) -> None:
     expect(page.get_by_test_id("customer-organization-side-menu-section-sectionId")).to_be_visible()
     page.get_by_role("button", name="Tables").click()
     page.wait_for_timeout(2000)
+    page.get_by_role("button", name="Tables").click()
+    page.wait_for_timeout(5000)
 
     # Wait for navigation to tables page
     page.wait_for_url("**/advance-table**", timeout=500000)
@@ -68,7 +70,7 @@ def test_example(page: Page) -> None:
     expect(page.get_by_role("button", name="ADD PLOT")).to_be_visible()
     expect(page.locator("a").filter(has_text="BUSINESS")).to_be_visible()
     expect(page.locator("a").filter(has_text="PERSONS")).to_be_visible()
-    expect(page.locator("a").filter(has_text="ROISX")).to_be_visible()
+    expect(page.locator("a").filter(has_text="ROIS")).to_be_visible()
     expect(page.locator("a").filter(has_text="INTERMENTS")).to_be_visible()
     page.locator("a").filter(has_text="INTERMENTS").click()
 
@@ -150,7 +152,7 @@ def test_example(page: Page) -> None:
     expect(page.get_by_test_id("customer-organization-advance-table-mat-dialog-container-h2-mat-dialog-title")).to_be_visible()
     expect(page.locator("div").filter(has_text=re.compile(r"^Section$")).nth(2)).to_be_visible()
     page.locator("div").filter(has_text=re.compile(r"^Section$")).nth(2).click()
-    page.get_by_role("option", name="A").click()
+    page.get_by_role("option", name="A", exact=True).click()
     expect(page.locator("div").filter(has_text=re.compile(r"^Row$")).nth(2)).to_be_visible()
     page.locator("div").filter(has_text=re.compile(r"^Row$")).nth(2).click()
     page.get_by_placeholder("Row").fill("z")
