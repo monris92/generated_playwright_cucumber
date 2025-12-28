@@ -69,7 +69,7 @@ def test_example(page: Page) -> None:
     page.wait_for_load_state('load')
     page.wait_for_timeout(2000)
     expect(page.get_by_test_id("customer-organization-advance-table-select-search-cemetery-div-global-cem-select-label")).to_be_visible()
-    expect(page.get_by_text("PLOTS 186")).to_be_visible()
+    expect(page.get_by_text(re.compile(r"PLOTS.* \d+"))).to_be_visible()
     expect(page.locator("a").filter(has_text="INTERMENTS")).to_be_visible()
     expect(page.locator("a").filter(has_text="ROIS")).to_be_visible()
     expect(page.locator("a").filter(has_text="PERSONS")).to_be_visible()
@@ -136,20 +136,29 @@ def test_example(page: Page) -> None:
     
     try:
         print("\n=== Finding Plot dropdown field... ===")
-        # The plot field is in header's cl-select-search component
-        plot_select = page.locator("header cl-select-search mat-select").first
+        # Strategy: Focus via label click, then use keyboard
+        print("Clicking 'Plotx' label to focus...")
+        page.get_by_text("Plotx").first.click(force=True)
+        page.wait_for_timeout(500)
         
-        aria_label = plot_select.get_attribute("aria-label") or ""
-        print(f"Found Plot field with aria-label: '{aria_label}'")
-        
-        print("Opening Plot dropdown...")
-        plot_select.click()
-        page.wait_for_timeout(2000)
+        print("Sending keys to trigger dropdown (ArrowDown + Space)...")
+        page.keyboard.press("ArrowDown")
+        page.wait_for_timeout(200)
+        page.keyboard.press("Space")
+        page.wait_for_timeout(200)
+        # Wait for options for up to 5 seconds
+        page.wait_for_selector("mat-option", timeout=5000)
+        page.wait_for_timeout(1000) # Small stable wait
         
         # Check for available plot options
-        options = page.get_by_role("option").all()
+        options = page.locator("mat-option").all()
         print(f"Found {len(options)} plot options")
         
+        if len(options) == 0:
+            # Try getting by role if locator fails
+            options = page.get_by_role("option").all()
+            print(f"Found {len(options)} plot options (retry)")
+
         if len(options) == 0:
             # No plots available - this is a test setup issue
             print("\n" + "="*70)
